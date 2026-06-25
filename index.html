@@ -698,18 +698,15 @@
                 const selectedArr = allProducts.filter(p => selectedProductIds.has(p.id));
 
                 const margin = 15;
-                const cols = 2;
-                const rowsPerPage = 3;
-                const itemsPerPage = cols * rowsPerPage;
-                const itemW = (210 - margin * 3) / 2; // Lebar sel ~90mm
                 
-                // Ukuran gambar rasio 4:5 
-                const imgW = 56;
-                const imgH = 70;
-                const itemH = 85; // Tinggi sel
+                // Ukuran gambar rasio 4:5 untuk format 1 Halaman 1 Produk
+                const imgW = 140; 
+                const imgH = 175;
+                
+                // Center gambar di layout A4 (Lebar A4 210mm)
+                const xImgOffset = (210 - imgW) / 2; 
+                const yBase = 35; // Jarak dari atas
 
-                let row = 0;
-                let col = 0;
                 let pageNum = 1;
 
                 function drawHeader(pNum) {
@@ -733,74 +730,73 @@
                 for (let i = 0; i < selectedArr.length; i++) {
                     const p = selectedArr[i];
                     
-                    if (i > 0 && i % itemsPerPage === 0) {
+                    // Tambah halaman baru untuk setiap produk setelah produk pertama
+                    if (i > 0) {
                         doc.addPage();
                         pageNum++;
                         drawHeader(pageNum);
-                        row = 0;
-                        col = 0;
                     }
-
-                    const xBase = margin + col * (itemW + margin);
-                    const yBase = 25 + row * itemH;
-                    const xImgOffset = xBase + ((itemW - imgW) / 2);
 
                     // Render Gambar Utama
                     if (p.imageId && !p.isKosong) {
                         try {
-                            const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w800`;
+                            // Menggunakan resolusi w1200 agar tajam saat dicetak 1 halaman penuh
+                            const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w1200`;
                             const imgData = await getBase64ImageFromUrl(imgUrl);
                             doc.addImage(imgData, 'JPEG', xImgOffset, yBase, imgW, imgH);
                         } catch(e) { 
                             doc.setDrawColor(200);
                             doc.rect(xImgOffset, yBase, imgW, imgH);
-                            doc.setFontSize(8);
+                            doc.setFontSize(12);
                             doc.setTextColor(150);
-                            doc.text("Gambar Tidak Tersedia", xImgOffset + 10, yBase + (imgH/2));
+                            doc.text("Gambar Tidak Tersedia", 105, yBase + (imgH/2), { align: "center" });
                         }
                     } else if (p.isKosong) {
                         try {
                             if (p.imageId) {
-                                const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w800`;
+                                const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w1200`;
                                 const imgData = await getBase64ImageFromUrl(imgUrl);
                                 doc.addImage(imgData, 'JPEG', xImgOffset, yBase, imgW, imgH);
+                            } else {
+                                doc.setDrawColor(200);
+                                doc.rect(xImgOffset, yBase, imgW, imgH);
                             }
                         } catch(e) {}
                         
                         doc.setFillColor(220, 38, 38); 
-                        doc.rect(xBase, yBase + (imgH/2) - 5, itemW, 10, 'F');
-                        doc.setFontSize(14);
+                        doc.rect(xImgOffset, yBase + (imgH/2) - 10, imgW, 20, 'F');
+                        doc.setFontSize(26);
                         doc.setFont("helvetica", "bold");
                         doc.setTextColor(255, 255, 255);
-                        doc.text("KOSONG", xBase + (itemW/2), yBase + (imgH/2) + 2, { align: "center" });
+                        doc.text("KOSONG", 105, yBase + (imgH/2) + 3, { align: "center" });
                     }
 
-                    // Render Teks Footer
-                    const textY = yBase + imgH + 5;
+                    // Render Teks Deskripsi di Bawah Gambar
+                    const textY = yBase + imgH + 15; // Jarak teks dari gambar
                     
-                    doc.setFontSize(8);
-                    doc.setFont("helvetica", "bold");
-                    doc.setTextColor(71, 85, 105); 
-                    let metaText = `SKU: ${p.sku}  |  Unit: ${p.unit}`;
-                    doc.text(metaText, xBase, textY);
-                    
-                    if (includePrice && p.price) {
-                        doc.setTextColor(22, 163, 74); 
-                        doc.text(`Harga: ${p.price}`, xBase, textY + 4);
-                    }
-
-                    doc.setFontSize(9);
+                    // Judul Produk
+                    doc.setFontSize(18);
                     doc.setFont("helvetica", "bold");
                     doc.setTextColor(15, 23, 42); 
                     
-                    let lines = doc.splitTextToSize(p.name, itemW);
+                    let lines = doc.splitTextToSize(p.name, 180);
                     if (lines.length > 2) { lines = [lines[0], lines[1] + '...']; }
-                    doc.text(lines, xBase, includePrice && p.price ? textY + 9 : textY + 5);
+                    doc.text(lines, 105, textY, { align: "center" });
 
-                    col++;
-                    if (col > 1) {
-                        col = 0;
-                        row++;
+                    // Info SKU & Unit
+                    const textYMeta = textY + (lines.length * 8) + 3;
+                    doc.setFontSize(12);
+                    doc.setFont("helvetica", "normal");
+                    doc.setTextColor(71, 85, 105); 
+                    let metaText = `SKU: ${p.sku}   |   Unit: ${p.unit}`;
+                    doc.text(metaText, 105, textYMeta, { align: "center" });
+                    
+                    // Info Harga
+                    if (includePrice && p.price) {
+                        doc.setFontSize(16);
+                        doc.setFont("helvetica", "bold");
+                        doc.setTextColor(22, 163, 74); 
+                        doc.text(`Harga: ${p.price}`, 105, textYMeta + 10, { align: "center" });
                     }
                 }
 
