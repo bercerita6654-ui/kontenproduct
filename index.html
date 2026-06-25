@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Konten Produk</title>
+    <title>Catalog Product</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -43,8 +43,8 @@
                         <i data-lucide="package" class="w-6 h-6"></i>
                     </div>
                     <div class="flex-1">
-                        <h1 class="text-xl font-extrabold text-gray-900 tracking-tight truncate">Konten Produk</h1>
-                        <p class="text-xs text-gray-500 font-medium truncate">Katalog Flyer & Knowledge Base</p>
+                        <h1 class="text-xl font-extrabold text-gray-900 tracking-tight truncate">Catalog Product</h1>
+                        <p class="text-xs text-gray-500 font-medium truncate">Flyer & Product Knowledge</p>
                     </div>
                 </div>
                 
@@ -279,6 +279,7 @@
                 const colKategori = headers.findIndex(h => h.includes('kategori'));
                 const colMerk = headers.findIndex(h => h.includes('merk') || h.includes('brand'));
                 const colQty = headers.findIndex(h => h.includes('qty'));
+                const colLastUpdate = headers.findIndex(h => h.includes('last update'));
 
                 const parsedData = [];
                 
@@ -302,6 +303,24 @@
                         }
                     }
 
+                    // Ambil dan parsing data Last Update
+                    let lastUpdateStr = '';
+                    let lastUpdateMs = 0;
+                    if (colLastUpdate !== -1 && rowData[colLastUpdate]) {
+                        lastUpdateStr = rowData[colLastUpdate].trim().replace(/[\r\n]+/g, ' ');
+                        let d = new Date(lastUpdateStr);
+                        if (!isNaN(d.getTime())) {
+                            lastUpdateMs = d.getTime();
+                        } else {
+                            // Coba parsing manual format DD/MM/YYYY
+                            const parts = lastUpdateStr.split(/[\/\- ]/);
+                            if (parts.length >= 3 && parts[2].length === 4) {
+                                d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                                if (!isNaN(d.getTime())) lastUpdateMs = d.getTime();
+                            }
+                        }
+                    }
+
                     let imageId = '';
                     if (colGambarStory !== -1 && rowData[colGambarStory]) {
                         const rawImageInfo = rowData[colGambarStory].trim();
@@ -309,8 +328,18 @@
                         imageId = match ? match[1] : rawImageInfo;
                     }
 
-                    parsedData.push({ id: i, sku, name, unit, imageId, category, brand, isKosong });
+                    parsedData.push({ id: i, sku, name, unit, imageId, category, brand, isKosong, lastUpdateStr, lastUpdateMs });
                 }
+
+                // Kalkulasi untuk menemukan produk update terbaru (dalam rentang 30 hari dari tanggal update terakhir di dokumen)
+                const maxMs = Math.max(0, ...parsedData.map(p => p.lastUpdateMs));
+                const THRESHOLD = 30 * 24 * 60 * 60 * 1000; // 30 hari
+                parsedData.forEach(p => {
+                    p.isNewUpdate = p.lastUpdateMs > 0 && (maxMs - p.lastUpdateMs <= THRESHOLD);
+                });
+
+                // Urutkan data berdasarkan lastUpdateMs dari yang terbaru ke yang terlama
+                parsedData.sort((a, b) => b.lastUpdateMs - a.lastUpdateMs);
 
                 allProducts = parsedData;
                 filteredProducts = [...allProducts];
@@ -428,9 +457,26 @@
                        </div>`
                     : '';
 
+                // Label pita NEW UPDATE
+                const newUpdateBadge = product.isNewUpdate
+                    ? `<div class="absolute top-2 left-2 sm:top-3 sm:left-3 z-30 pointer-events-none">
+                         <span class="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] sm:text-xs font-extrabold px-2 py-1 rounded-md shadow-lg flex items-center gap-1 border border-orange-300">
+                           <i data-lucide="sparkles" class="w-3 h-3"></i> NEW UPDATE
+                         </span>
+                       </div>`
+                    : '';
+
+                // Label teks Last Update untuk bagian detail
+                const lastUpdatePill = product.lastUpdateStr 
+                    ? `<span class="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-amber-50 text-amber-700 text-[10px] sm:text-xs font-bold rounded flex items-center gap-1 border border-amber-100 flex-shrink-0" title="Last Update: ${escapeHTML(product.lastUpdateStr)}">
+                          <i data-lucide="calendar-clock" class="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0"></i> <span class="truncate max-w-[60px] sm:max-w-[100px]">${escapeHTML(product.lastUpdateStr)}</span>
+                       </span>`
+                    : '';
+
                 gridHTML += `
                 <div class="bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col group relative">
                     <div class="w-full aspect-[4/5] bg-gray-50 relative overflow-hidden flex items-center justify-center">
+                        ${newUpdateBadge}
                         ${imageContent}
                         ${outOfStockOverlay}
                         <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
@@ -443,6 +489,7 @@
                             <span class="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-emerald-50 text-emerald-700 text-[10px] sm:text-xs font-bold rounded flex items-center gap-1 border border-emerald-100 flex-shrink-0">
                                 <i data-lucide="layers" class="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0"></i> ${escapeHTML(product.unit) || '-'}
                             </span>
+                            ${lastUpdatePill}
                         </div>
                         <h3 class="text-gray-800 font-bold text-xs sm:text-base leading-snug line-clamp-2" title="${escapeHTML(product.name)}">
                             ${escapeHTML(product.name) || 'Produk Tanpa Nama'}
