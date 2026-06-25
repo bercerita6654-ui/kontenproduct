@@ -212,8 +212,8 @@
             <!-- Loading State saat men-download PDF sebenarnya -->
             <div id="previewLoading" class="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center z-[100] hidden">
                 <div class="pdf-loader mb-4 !border-blue-200 !border-t-blue-600"></div>
-                <p class="text-gray-800 font-bold tracking-wide text-xl">Mengekspor Katalog ke PDF...</p>
-                <p class="text-gray-500 text-sm mt-2 text-center px-4">Mengunduh aset & merender halaman.<br>Harap tunggu sebentar.</p>
+                <p id="pdfProgressText" class="text-gray-800 font-bold tracking-wide text-xl text-center">Mengekspor Katalog ke PDF...</p>
+                <p class="text-gray-600 text-sm mt-2 text-center px-4">Mengunduh aset & merender halaman.<br>Harap tunggu dan jangan menutup jendela ini.</p>
             </div>
 
             <!-- Footer Modal -->
@@ -321,6 +321,7 @@
             pdfIncludePrice: document.getElementById('pdfIncludePrice'),
             htmlPreviewContainer: document.getElementById('htmlPreviewContainer'),
             previewLoading: document.getElementById('previewLoading'),
+            pdfProgressText: document.getElementById('pdfProgressText'),
             downloadActualPdfBtn: document.getElementById('downloadActualPdfBtn')
         };
 
@@ -727,47 +728,40 @@
             lucide.createIcons();
         }
 
-        // Helper andal membypass batas CORS melalui Canvas HTML saat mengubah gambar ke bentuk PDF
-        function getBase64ImageFromUrl(imageUrl) {
-            return new Promise((resolve, reject) => {
-                const processImage = (src) => {
-                    return new Promise((res, rej) => {
-                        const img = new Image();
-                        img.crossOrigin = 'Anonymous'; 
-                        img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                            const ctx = canvas.getContext('2d');
-                            ctx.fillStyle = '#FFFFFF';
-                            ctx.fillRect(0, 0, canvas.width, canvas.height);
-                            ctx.drawImage(img, 0, 0);
-                            res(canvas.toDataURL('image/jpeg', 0.95));
-                        };
-                        img.onerror = rej;
-                        img.src = src;
-                    });
-                };
-
-                // 1. Coba metode normal URL
-                processImage(imageUrl)
-                    .then(resolve)
-                    .catch(() => {
-                        // 2. Coba lewat proxy Google untuk tembus CORS
-                        console.warn("Gambar diblokir CORS, mencoba mengambil melalui Proxy...");
-                        const proxyUrl1 = `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?url=${encodeURIComponent(imageUrl)}&container=focus&refresh=2592000`;
-                        processImage(proxyUrl1)
-                            .then(resolve)
-                            .catch(() => {
-                                // 3. Coba lewat proxy Allorigins sebagai benteng terakhir
-                                console.warn("Proxy 1 diblokir, mencoba Proxy 2...");
-                                const proxyUrl2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`;
-                                processImage(proxyUrl2)
-                                    .then(resolve)
-                                    .catch((err) => reject(new Error('Gagal merender gambar ke PDF')));
-                            });
-                    });
-            });
+        // FUNGSI BARU PENGAMBIL GAMBAR (Tahan Banting & Cepat)
+        async function getBase64ImageFromUrl(imageUrl) {
+            try {
+                // Metode 1: Mengambil Data URI Base64 langsung menggunakan AllOrigins Proxy
+                // Ini menembus pemblokiran CORS browser secara sempurna & anti-error.
+                const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(imageUrl)}`);
+                if (!response.ok) throw new Error("Network response was not ok");
+                
+                const data = await response.json();
+                if (data.contents && data.contents.startsWith('data:image')) {
+                    return data.contents;
+                }
+                throw new Error("Format proxy tidak valid");
+            } catch (error) {
+                console.warn("Metode 1 gagal, beralih ke Metode 2 (Google Proxy + Canvas)...", error);
+                
+                // Metode 2: Menggunakan Google Gadgets Proxy + HTML Canvas
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.crossOrigin = 'Anonymous';
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/jpeg', 0.8));
+                    };
+                    img.onerror = () => reject(new Error('Gagal merender gambar ke PDF'));
+                    img.src = `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?url=${encodeURIComponent(imageUrl)}&container=focus&refresh=2592000`;
+                });
+            }
         }
 
         // Proses penarikan PDF sesungguhnya
@@ -783,20 +777,25 @@
                 const selectedArr = allProducts.filter(p => selectedProductIds.has(p.id));
 
                 const margin = 15;
-                const imgW = 160; // Diperbesar
-                const imgH = 200; // Aspek Rasio 4:5
-                const xImgOffset = (210 - imgW) / 2; // Otomatis tengah (25)
-                const yBase = 25; // Dinaikkan sedikit untuk memberi ruang lebih besar
+                const imgW = 160; 
+                const imgH = 200; 
+                const xImgOffset = (210 - imgW) / 2; 
+                const yBase = 25; 
 
                 for (let i = 0; i < selectedArr.length; i++) {
                     const p = selectedArr[i];
                     let pageNum = i + 1;
 
+                    // Update loading text
+                    if (DOM.pdfProgressText) {
+                        DOM.pdfProgressText.innerText = `Mengekspor Produk ${pageNum} dari ${selectedArr.length}...`;
+                    }
+
                     if (i > 0) {
                         doc.addPage();
                     }
 
-                    // Header PDF (Hanya Tulisan Judul)
+                    // Header PDF
                     doc.setFontSize(16);
                     doc.setFont("helvetica", "bold");
                     doc.setTextColor(30, 64, 175); 
@@ -809,7 +808,8 @@
                     // Gambar Besar di Tengah
                     if (p.imageId && !p.isKosong) {
                         try {
-                            const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w1200`;
+                            // OPTIMALISASI: Gunakan w800. Jauh lebih cepat di-download, kualitas tetap sangat bagus di PDF A4
+                            const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w800`;
                             const imgData = await getBase64ImageFromUrl(imgUrl);
                             doc.addImage(imgData, 'JPEG', xImgOffset, yBase, imgW, imgH);
                         } catch(e) { 
@@ -823,7 +823,7 @@
                     } else if (p.isKosong) {
                         try {
                             if (p.imageId) {
-                                const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w1200`;
+                                const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w800`;
                                 const imgData = await getBase64ImageFromUrl(imgUrl);
                                 doc.addImage(imgData, 'JPEG', xImgOffset, yBase, imgW, imgH);
                             } else {
@@ -843,7 +843,6 @@
                     // Teks Keterangan dibawah Gambar
                     const textY = yBase + imgH + 10; 
                     
-                    // Deteksi panjang nama untuk scaling font agar tidak terpotong
                     let nameLen = p.name.length;
                     let fontSize = 18;
                     if (nameLen > 80) fontSize = 12;
@@ -854,7 +853,6 @@
                     doc.setTextColor(15, 23, 42); 
                     
                     let lines = doc.splitTextToSize(p.name, 180);
-                    // Langsung cetak semua baris teks tanpa limit
                     doc.text(lines, 105, textY, { align: "center" });
 
                     const textYMeta = textY + (lines.length * (fontSize * 0.35)) + 4;
@@ -871,13 +869,15 @@
                         doc.text(`Harga: ${p.price}`, 105, textYMeta + 8, { align: "center" });
                     }
 
-                    // Footer PDF (Nomor Halaman di sudut kanan bawah)
+                    // Footer PDF
                     doc.setFontSize(10);
                     doc.setFont("helvetica", "normal");
                     doc.setTextColor(100, 116, 139); 
                     doc.text(`Halaman ${pageNum}`, 210 - margin, 297 - 10, { align: "right" });
                 }
 
+                if (DOM.pdfProgressText) DOM.pdfProgressText.innerText = `Menyelesaikan PDF...`;
+                
                 doc.save("Katalog_Produk.pdf");
                 showToast("Katalog PDF berhasil disimpan!");
                 closeCatalogPreview();
@@ -889,6 +889,7 @@
             } finally {
                 DOM.previewLoading.classList.add('hidden');
                 DOM.downloadActualPdfBtn.disabled = false;
+                if (DOM.pdfProgressText) DOM.pdfProgressText.innerText = `Mengekspor Katalog ke PDF...`;
             }
         }
 
