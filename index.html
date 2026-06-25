@@ -8,8 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- jsPDF Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        /* Custom scrollbar for a cleaner look */
+        /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -24,15 +26,9 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8; 
         }
-        .line-clamp-2 {
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;  
-            overflow: hidden;
-        }
     </style>
 </head>
-<body class="min-h-screen bg-slate-50 font-sans text-gray-800 selection:bg-blue-200 relative overflow-x-hidden">
+<body class="min-h-screen bg-slate-50 font-sans text-gray-800 selection:bg-blue-200 relative overflow-x-hidden pb-20">
 
     <!-- Navbar / Header -->
     <header class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
@@ -60,7 +56,6 @@
                             <select id="categoryFilter" class="block w-full pl-9 pr-8 py-2.5 border border-gray-300 rounded-xl leading-5 bg-gray-50 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-gray-700 text-ellipsis overflow-hidden whitespace-nowrap cursor-pointer appearance-none">
                                 <option value="">Semua Kategori</option>
                             </select>
-                            <!-- Custom dropdown arrow -->
                             <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                                 <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
                             </div>
@@ -155,6 +150,73 @@
         </div>
     </main>
 
+    <!-- Floating Action Bar for Selected Products -->
+    <div id="selectionBar" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.15)] z-[60] transform translate-y-full transition-transform duration-300">
+        <div class="max-w-7xl mx-auto px-4 py-3 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <div class="bg-blue-100 text-blue-700 w-7 h-7 flex items-center justify-center rounded-full font-bold">
+                    <span id="selCount">0</span>
+                </div>
+                Produk Terpilih
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <button onclick="clearSelection()" class="flex-1 sm:flex-none px-4 py-2.5 text-gray-600 bg-gray-100 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors">
+                    Batal
+                </button>
+                <!-- Tombol Berubah Menjadi Lihat Katalog -->
+                <button onclick="openCatalogPreview()" class="flex-1 sm:flex-none px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-md hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors">
+                    <i data-lucide="book-open" class="w-4 h-4"></i> Lihat Katalog
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Preview Katalog PDF -->
+    <div id="catalogPreviewModal" class="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300" onclick="closeCatalogPreview()">
+        <div class="bg-white rounded-2xl w-full max-w-5xl h-[95vh] sm:h-[90vh] flex flex-col shadow-2xl relative overflow-hidden" onclick="event.stopPropagation()">
+            <!-- Header Modal -->
+            <div class="flex items-center justify-between p-4 border-b bg-white z-20">
+                <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <i data-lucide="file-text" class="w-5 h-5 text-blue-600"></i> Preview Katalog
+                </h3>
+                <button onclick="closeCatalogPreview()" class="text-gray-400 hover:text-gray-700 focus:outline-none p-2 rounded-full hover:bg-gray-100 transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <!-- Toolbar Pengaturan PDF -->
+            <div class="px-4 py-3 bg-gray-50 border-b flex flex-wrap items-center justify-between gap-4 z-20">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="pdfIncludePrice" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 transition-colors" checked onchange="updatePDFPreview()">
+                    <div class="flex flex-col">
+                        <span class="text-sm font-semibold text-gray-800">Lampirkan Harga</span>
+                        <span class="text-xs text-gray-500 hidden sm:block">Diambil dari kolom 'Eceran'</span>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Area Preview Iframe -->
+            <div class="flex-1 relative bg-gray-200 p-2 sm:p-4 overflow-hidden flex flex-col">
+                <iframe id="pdfPreviewFrame" class="w-full h-full rounded-lg shadow-inner border-0 bg-white"></iframe>
+                
+                <!-- Loading State saat membuat Preview PDF -->
+                <div id="previewLoading" class="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center z-10 hidden">
+                    <div class="pdf-loader mb-4 !border-blue-200 !border-t-blue-600"></div>
+                    <p class="text-gray-800 font-bold tracking-wide">Menyiapkan Preview...</p>
+                    <p class="text-gray-500 text-sm mt-1">Mengunduh aset & merender halaman</p>
+                </div>
+            </div>
+
+            <!-- Footer Modal -->
+            <div class="p-4 border-t bg-white flex justify-end gap-3 z-20">
+                <button onclick="closeCatalogPreview()" class="px-5 py-2.5 text-gray-600 bg-gray-100 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors">Batal</button>
+                <button id="downloadActualPdfBtn" onclick="downloadGeneratedPDF()" class="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-md hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i data-lucide="download" class="w-4 h-4"></i> Download ke PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Gambar Besar -->
     <div id="imageModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-sm transition-opacity duration-300 hidden opacity-0" onclick="closeModal()">
         <div class="relative w-full h-full max-w-4xl flex flex-col items-center justify-center p-2" onclick="event.stopPropagation()">
@@ -205,7 +267,9 @@
         
         let allProducts = [];
         let filteredProducts = [];
+        let selectedProductIds = new Set();
         let currentPage = 1;
+        let currentPdfDoc = null; // Menyimpan instance PDF sementara
 
         // Fungsi Helper untuk mencegah error dari karakter khusus
         function escapeHTML(str) {
@@ -242,7 +306,16 @@
             modalShareText: document.getElementById('modalShareText'),
             modalDownloadBtn: document.getElementById('modalDownloadBtn'),
             toast: document.getElementById('toastNotification'),
-            toastMsg: document.getElementById('toastMessageText')
+            toastMsg: document.getElementById('toastMessageText'),
+            selectionBar: document.getElementById('selectionBar'),
+            selCount: document.getElementById('selCount'),
+            
+            // Preview Modal Elements
+            catalogPreviewModal: document.getElementById('catalogPreviewModal'),
+            pdfIncludePrice: document.getElementById('pdfIncludePrice'),
+            pdfPreviewFrame: document.getElementById('pdfPreviewFrame'),
+            previewLoading: document.getElementById('previewLoading'),
+            downloadActualPdfBtn: document.getElementById('downloadActualPdfBtn')
         };
 
         // Initialize Lucide Icons
@@ -252,7 +325,6 @@
         async function fetchData() {
             showState('loading');
             try {
-                // Tambahkan param acak (timestamp) agar selalu mengambil data CSV ter-update (mencegah cache browser)
                 const cacheBusterUrl = `${CSV_URL}&t=${new Date().getTime()}`;
                 const response = await fetch(cacheBusterUrl);
                 
@@ -260,7 +332,7 @@
                 
                 const text = await response.text();
                 
-                // Manual CSV Parser (Handles quotes & commas correctly)
+                // Manual CSV Parser
                 const arr = [];
                 let quote = false;
                 let row = 0, col = 0;
@@ -288,10 +360,11 @@
                 const colMerk = headers.findIndex(h => h.includes('merk') || h.includes('brand'));
                 const colQty = headers.findIndex(h => h.includes('qty'));
                 const colLastUpdate = headers.findIndex(h => h.includes('last update'));
+                const colEceran = headers.findIndex(h => h.includes('eceran'));
 
                 const parsedData = [];
                 
-                // Extract Data (starting row index 1)
+                // Extract Data
                 for (let i = 1; i < arr.length; i++) {
                     const rowData = arr[i];
                     if (rowData.length < 4 || !rowData[0]) continue; 
@@ -301,6 +374,7 @@
                     const unit = rowData[3] ? rowData[3].trim().replace(/[\r\n]+/g, ' ') : '';
                     const category = colKategori !== -1 && rowData[colKategori] ? rowData[colKategori].trim().replace(/[\r\n]+/g, ' ') : '';
                     const brand = colMerk !== -1 && rowData[colMerk] ? rowData[colMerk].trim().replace(/[\r\n]+/g, ' ') : '';
+                    const price = colEceran !== -1 && rowData[colEceran] ? rowData[colEceran].trim().replace(/[\r\n]+/g, ' ') : '';
 
                     // Cek ketersediaan barang (Qty <= 0)
                     let isKosong = false;
@@ -311,7 +385,7 @@
                         }
                     }
 
-                    // Ambil dan parsing data Last Update (Mendukung Tanggal dan Jam secara akurat)
+                    // Ambil dan parsing data Last Update
                     let lastUpdateStr = '';
                     let lastUpdateMs = 0;
                     if (colLastUpdate !== -1 && rowData[colLastUpdate]) {
@@ -320,22 +394,19 @@
                         if (!isNaN(d.getTime())) {
                             lastUpdateMs = d.getTime();
                         } else {
-                            // Coba parsing manual untuk format DD/MM/YYYY HH:mm:ss
                             const parts = lastUpdateStr.split(/[\/\- \:]/);
                             if (parts.length >= 3) {
                                 const day = parseInt(parts[0], 10);
-                                const month = parseInt(parts[1], 10) - 1; // bulan index dimulai dari 0
+                                const month = parseInt(parts[1], 10) - 1; 
                                 const year = parseInt(parts[2], 10);
                                 const hours = parts.length > 3 ? parseInt(parts[3], 10) : 0;
                                 const minutes = parts.length > 4 ? parseInt(parts[4], 10) : 0;
                                 const seconds = parts.length > 5 ? parseInt(parts[5], 10) : 0;
 
-                                // Cek apakah posisi ke-3 adalah tahun (Format: DD/MM/YYYY)
                                 if (parts[2] && parts[2].length === 4) {
                                     d = new Date(year, month, day, hours, minutes, seconds);
                                     if (!isNaN(d.getTime())) lastUpdateMs = d.getTime();
                                 } 
-                                // Jika posisi pertama adalah tahun (Format: YYYY/MM/DD)
                                 else if (parts[0] && parts[0].length === 4) {
                                     d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]), hours, minutes, seconds);
                                     if (!isNaN(d.getTime())) lastUpdateMs = d.getTime();
@@ -351,17 +422,17 @@
                         imageId = match ? match[1] : rawImageInfo;
                     }
 
-                    parsedData.push({ id: i, sku, name, unit, imageId, category, brand, isKosong, lastUpdateStr, lastUpdateMs });
+                    parsedData.push({ id: i.toString(), sku, name, unit, imageId, category, brand, isKosong, lastUpdateStr, lastUpdateMs, price });
                 }
 
-                // Kalkulasi untuk menemukan produk update terbaru (dalam rentang 30 hari dari tanggal update terakhir di dokumen)
+                // Kalkulasi NEW UPDATE
                 const maxMs = Math.max(0, ...parsedData.map(p => p.lastUpdateMs));
-                const THRESHOLD = 30 * 24 * 60 * 60 * 1000; // 30 hari
+                const THRESHOLD = 30 * 24 * 60 * 60 * 1000; 
                 parsedData.forEach(p => {
                     p.isNewUpdate = p.lastUpdateMs > 0 && (maxMs - p.lastUpdateMs <= THRESHOLD);
                 });
 
-                // Urutkan data berdasarkan lastUpdateMs (tanggal dan jam), dari yang terbaru ke yang terlama
+                // Urutkan data berdasarkan lastUpdateMs dari terbaru ke terlama
                 parsedData.sort((a, b) => b.lastUpdateMs - a.lastUpdateMs);
 
                 allProducts = parsedData;
@@ -426,12 +497,38 @@
             renderView();
         }
 
-        // Reset Filters UI
         function resetFilters() {
             DOM.searchInput.value = '';
             DOM.categoryFilter.value = '';
             DOM.brandFilter.value = '';
             applyFilters();
+        }
+
+        // Fungsi untuk men-toggle seleksi PDF
+        function toggleSelection(event, id) {
+            event.stopPropagation();
+            if (selectedProductIds.has(id)) {
+                selectedProductIds.delete(id);
+            } else {
+                selectedProductIds.add(id);
+            }
+            renderView();
+            updateSelectionBar();
+        }
+
+        function updateSelectionBar() {
+            if (selectedProductIds.size > 0) {
+                DOM.selectionBar.classList.remove('translate-y-full');
+                DOM.selCount.textContent = selectedProductIds.size;
+            } else {
+                DOM.selectionBar.classList.add('translate-y-full');
+            }
+        }
+
+        function clearSelection() {
+            selectedProductIds.clear();
+            renderView();
+            updateSelectionBar();
         }
 
         // Render Current Page Grid
@@ -460,6 +557,7 @@
             paginatedData.forEach(product => {
                 const imgThumbUrl = product.imageId ? `https://drive.google.com/thumbnail?id=${product.imageId}&sz=w800` : '';
                 const imgLargeUrl = product.imageId ? `https://drive.google.com/thumbnail?id=${product.imageId}&sz=w1200` : '';
+                const isSelected = selectedProductIds.has(product.id);
                 
                 const imageContent = product.imageId 
                     ? `<img src="${imgThumbUrl}" alt="Flyer ${escapeHTML(product.name)}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" data-imageurl="${imgLargeUrl}" data-sku="${escapeHTML(product.sku)}" data-name="${escapeHTML(product.name)}" data-iskosong="${product.isKosong}" onclick="handleImageClick(this)" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
@@ -480,7 +578,6 @@
                        </div>`
                     : '';
 
-                // Label pita NEW UPDATE
                 const newUpdateBadge = product.isNewUpdate
                     ? `<div class="absolute top-2 left-2 sm:top-3 sm:left-3 z-30 pointer-events-none">
                          <span class="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] sm:text-xs font-extrabold px-2 py-1 rounded-md shadow-lg flex items-center gap-1 border border-orange-300">
@@ -489,7 +586,18 @@
                        </div>`
                     : '';
 
-                // Label teks Last Update untuk bagian detail
+                const checkIconClass = isSelected 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md scale-110' 
+                    : 'bg-white/90 text-gray-400 border-gray-200 hover:text-gray-600 hover:border-gray-400 shadow-sm';
+                
+                const selectionOverlay = `
+                    <div class="absolute top-2 right-2 sm:top-3 sm:right-3 z-30">
+                        <button onclick="toggleSelection(event, '${product.id}')" class="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 transition-all backdrop-blur-sm ${checkIconClass}" title="Pilih produk untuk Katalog PDF">
+                            <i data-lucide="check" class="w-3 h-3 sm:w-4 sm:h-4 ${isSelected ? 'opacity-100' : 'opacity-0'} transition-opacity"></i>
+                        </button>
+                    </div>
+                `;
+
                 const lastUpdatePill = product.lastUpdateStr 
                     ? `<span class="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-amber-50 text-amber-700 text-[10px] sm:text-xs font-bold rounded flex items-center gap-1 border border-amber-100 flex-shrink-0" title="Last Update: ${escapeHTML(product.lastUpdateStr)}">
                           <i data-lucide="calendar-clock" class="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0"></i> <span class="truncate max-w-[60px] sm:max-w-[100px]">${escapeHTML(product.lastUpdateStr)}</span>
@@ -497,9 +605,10 @@
                     : '';
 
                 gridHTML += `
-                <div class="bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col group relative">
+                <div class="bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border ${isSelected ? 'border-blue-400 ring-2 ring-blue-100' : 'border-gray-100'} flex flex-col group relative">
                     <div class="w-full aspect-[4/5] bg-gray-50 relative overflow-hidden flex items-center justify-center">
                         ${newUpdateBadge}
+                        ${selectionOverlay}
                         ${imageContent}
                         ${outOfStockOverlay}
                         <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
@@ -545,13 +654,191 @@
             }
         }
 
-        // Logic membagikan Konten (Coba share File Gambar, fallback ke URL)
+        // --- STREAMING_CHUNK:Logic PDF Generation & Preview ---
+        
+        function openCatalogPreview() {
+            DOM.catalogPreviewModal.classList.remove('hidden');
+            setTimeout(() => DOM.catalogPreviewModal.classList.remove('opacity-0'), 10);
+            updatePDFPreview(); // Buat & tampilkan preview awal
+        }
+
+        function closeCatalogPreview() {
+            DOM.catalogPreviewModal.classList.add('opacity-0');
+            setTimeout(() => {
+                DOM.catalogPreviewModal.classList.add('hidden');
+                DOM.pdfPreviewFrame.src = ''; // Bersihkan iframe memori
+                currentPdfDoc = null; 
+            }, 300);
+        }
+
+        async function getBase64ImageFromUrl(imageUrl) {
+            const res = await fetch(imageUrl);
+            const blob = await res.blob();
+            return new Promise((resolve, reject) => {
+                const reader  = new FileReader();
+                reader.addEventListener("load", function () { resolve(reader.result); }, false);
+                reader.onerror = () => { reject("Error converting image"); };
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        // Fungsi membuat PDF dan menyisipkannya ke iFrame sbg Preview
+        async function updatePDFPreview() {
+            const includePrice = DOM.pdfIncludePrice.checked;
+            
+            // Tampilkan loading overlay di dalam iframe area
+            DOM.previewLoading.classList.remove('hidden');
+            DOM.downloadActualPdfBtn.disabled = true;
+            DOM.pdfIncludePrice.disabled = true; // Lock checkbox selama render
+
+            try {
+                const { jsPDF } = window.jspdf;
+                // A4 Size: 210 x 297 mm
+                const doc = new jsPDF('p', 'mm', 'a4');
+                const selectedArr = allProducts.filter(p => selectedProductIds.has(p.id));
+
+                const margin = 15;
+                const cols = 2;
+                const rowsPerPage = 3;
+                const itemsPerPage = cols * rowsPerPage;
+                const itemW = (210 - margin * 3) / 2; // Lebar sel ~90mm
+                
+                // Ukuran gambar rasio 4:5 
+                const imgW = 56;
+                const imgH = 70;
+                const itemH = 85; // Tinggi sel
+
+                let row = 0;
+                let col = 0;
+                let pageNum = 1;
+
+                function drawHeader(pNum) {
+                    doc.setFontSize(16);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(30, 64, 175); 
+                    doc.text("Katalog Produk", margin, 15);
+                    
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "normal");
+                    doc.setTextColor(100, 116, 139); 
+                    doc.text(`Halaman ${pNum}`, 210 - margin, 15, { align: "right" });
+
+                    doc.setDrawColor(226, 232, 240); 
+                    doc.setLineWidth(0.5);
+                    doc.line(margin, 18, 210 - margin, 18);
+                }
+
+                drawHeader(pageNum);
+
+                for (let i = 0; i < selectedArr.length; i++) {
+                    const p = selectedArr[i];
+                    
+                    if (i > 0 && i % itemsPerPage === 0) {
+                        doc.addPage();
+                        pageNum++;
+                        drawHeader(pageNum);
+                        row = 0;
+                        col = 0;
+                    }
+
+                    const xBase = margin + col * (itemW + margin);
+                    const yBase = 25 + row * itemH;
+                    const xImgOffset = xBase + ((itemW - imgW) / 2);
+
+                    // Render Gambar Utama
+                    if (p.imageId && !p.isKosong) {
+                        try {
+                            const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w800`;
+                            const imgData = await getBase64ImageFromUrl(imgUrl);
+                            doc.addImage(imgData, 'JPEG', xImgOffset, yBase, imgW, imgH);
+                        } catch(e) { 
+                            doc.setDrawColor(200);
+                            doc.rect(xImgOffset, yBase, imgW, imgH);
+                            doc.setFontSize(8);
+                            doc.setTextColor(150);
+                            doc.text("Gambar Tidak Tersedia", xImgOffset + 10, yBase + (imgH/2));
+                        }
+                    } else if (p.isKosong) {
+                        try {
+                            if (p.imageId) {
+                                const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w800`;
+                                const imgData = await getBase64ImageFromUrl(imgUrl);
+                                doc.addImage(imgData, 'JPEG', xImgOffset, yBase, imgW, imgH);
+                            }
+                        } catch(e) {}
+                        
+                        doc.setFillColor(220, 38, 38); 
+                        doc.rect(xBase, yBase + (imgH/2) - 5, itemW, 10, 'F');
+                        doc.setFontSize(14);
+                        doc.setFont("helvetica", "bold");
+                        doc.setTextColor(255, 255, 255);
+                        doc.text("KOSONG", xBase + (itemW/2), yBase + (imgH/2) + 2, { align: "center" });
+                    }
+
+                    // Render Teks Footer
+                    const textY = yBase + imgH + 5;
+                    
+                    doc.setFontSize(8);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(71, 85, 105); 
+                    let metaText = `SKU: ${p.sku}  |  Unit: ${p.unit}`;
+                    doc.text(metaText, xBase, textY);
+                    
+                    if (includePrice && p.price) {
+                        doc.setTextColor(22, 163, 74); 
+                        doc.text(`Harga: ${p.price}`, xBase, textY + 4);
+                    }
+
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(15, 23, 42); 
+                    
+                    let lines = doc.splitTextToSize(p.name, itemW);
+                    if (lines.length > 2) { lines = [lines[0], lines[1] + '...']; }
+                    doc.text(lines, xBase, includePrice && p.price ? textY + 9 : textY + 5);
+
+                    col++;
+                    if (col > 1) {
+                        col = 0;
+                        row++;
+                    }
+                }
+
+                // Simpan object PDF secara global agar bisa didownload langsung tanpa render ulang
+                currentPdfDoc = doc;
+                
+                // Konversi PDF ke URL Blob dan tampilkan di iFrame
+                const pdfBlobUrl = doc.output('bloburl');
+                DOM.pdfPreviewFrame.src = pdfBlobUrl;
+
+            } catch (err) {
+                console.error(err);
+                showToast("Gagal memuat preview PDF.");
+            } finally {
+                DOM.previewLoading.classList.add('hidden');
+                DOM.downloadActualPdfBtn.disabled = false;
+                DOM.pdfIncludePrice.disabled = false; // Buka kunci checkbox
+            }
+        }
+
+        // Fungsi ketika user mengklik tombol "Download PDF" yang asli
+        function downloadGeneratedPDF() {
+            if (currentPdfDoc) {
+                currentPdfDoc.save("Katalog_Produk.pdf");
+                showToast("Katalog PDF berhasil disimpan!");
+                closeCatalogPreview();
+                clearSelection();
+            }
+        }
+
+        // --- Akhir Logic PDF ---
+
+        // --- STREAMING_CHUNK:Logic Modal Besar & Image sharing ---
         async function shareContent(imageUrl, sku, name) {
             DOM.modalShareText.textContent = "Memproses...";
             const textToCopy = `${sku} ${name}`;
             
             try {
-                // Mencoba mengambil data gambar untuk di-share sebagai file ke IG Story/WA Story
                 const response = await fetch(imageUrl);
                 const blob = await response.blob();
                 const file = new File([blob], `${sku}.jpg`, { type: blob.type || 'image/jpeg' });
@@ -566,7 +853,6 @@
                     throw new Error("Tidak mendukung share file");
                 }
             } catch (error) {
-                // Fallback jika fetch diblokir (CORS) atau device tidak mendukung
                 console.log("Fallback ke share teks/url", error);
                 if (navigator.share) {
                     navigator.share({
@@ -588,7 +874,6 @@
             const name = element.getAttribute('data-name');
             const isKosong = element.getAttribute('data-iskosong') === 'true';
 
-            // 1. Tampilkan Modal
             if(imageUrl) {
                 DOM.modalImg.src = imageUrl;
                 DOM.modal.classList.remove('hidden');
@@ -597,14 +882,11 @@
                 if (isKosong) DOM.modalKosong.classList.remove('hidden');
                 else DOM.modalKosong.classList.add('hidden');
 
-                // Hubungkan tombol dengan data gambar yang sedang dibuka
                 DOM.modalShareBtn.onclick = () => shareContent(imageUrl, sku, name);
                 DOM.modalDownloadBtn.onclick = () => window.open(imageUrl, '_blank');
             }
 
             const textToCopy = `${sku} ${name}`;
-
-            // 2. Teks tetap otomatis disalin ke clipboard
             const textArea = document.createElement("textarea");
             textArea.value = textToCopy;
             textArea.style.position = "fixed";
@@ -643,8 +925,9 @@
         DOM.brandFilter.addEventListener('change', applyFilters);
         
         document.addEventListener('keydown', (e) => {
-            if(e.key === 'Escape' && !DOM.modal.classList.contains('hidden')) {
-                closeModal();
+            if(e.key === 'Escape') {
+                if(!DOM.catalogPreviewModal.classList.contains('hidden')) closeCatalogPreview();
+                else if(!DOM.modal.classList.contains('hidden')) closeModal();
             }
         });
 
