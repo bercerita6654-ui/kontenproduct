@@ -80,12 +80,17 @@
                         </div>
                     </div>
 
-                    <!-- Search Input -->
-                    <div class="relative group w-full sm:w-56 lg:w-64 flex-shrink-0">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i data-lucide="search" class="h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors"></i>
+                    <!-- Search Input & Refresh Button -->
+                    <div class="flex gap-2 w-full sm:w-auto flex-shrink-0">
+                        <div class="relative group flex-1 sm:w-56 lg:w-64">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i data-lucide="search" class="h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors"></i>
+                            </div>
+                            <input type="text" id="searchInput" class="block w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl leading-5 bg-gray-50 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm" placeholder="Cari SKU / Nama...">
                         </div>
-                        <input type="text" id="searchInput" class="block w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl leading-5 bg-gray-50 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm" placeholder="Cari SKU / Nama...">
+                        <button onclick="fetchData()" class="flex items-center justify-center p-2.5 bg-white border border-gray-300 text-gray-600 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 rounded-xl shadow-sm transition-all flex-shrink-0" title="Refresh Data">
+                            <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -247,7 +252,10 @@
         async function fetchData() {
             showState('loading');
             try {
-                const response = await fetch(CSV_URL);
+                // Tambahkan param acak (timestamp) agar selalu mengambil data CSV ter-update (mencegah cache browser)
+                const cacheBusterUrl = `${CSV_URL}&t=${new Date().getTime()}`;
+                const response = await fetch(cacheBusterUrl);
+                
                 if (!response.ok) throw new Error('Gagal terhubung ke sumber data Google Sheets.');
                 
                 const text = await response.text();
@@ -303,7 +311,7 @@
                         }
                     }
 
-                    // Ambil dan parsing data Last Update
+                    // Ambil dan parsing data Last Update (Mendukung Tanggal dan Jam secara akurat)
                     let lastUpdateStr = '';
                     let lastUpdateMs = 0;
                     if (colLastUpdate !== -1 && rowData[colLastUpdate]) {
@@ -312,11 +320,26 @@
                         if (!isNaN(d.getTime())) {
                             lastUpdateMs = d.getTime();
                         } else {
-                            // Coba parsing manual format DD/MM/YYYY
-                            const parts = lastUpdateStr.split(/[\/\- ]/);
-                            if (parts.length >= 3 && parts[2].length === 4) {
-                                d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                                if (!isNaN(d.getTime())) lastUpdateMs = d.getTime();
+                            // Coba parsing manual untuk format DD/MM/YYYY HH:mm:ss
+                            const parts = lastUpdateStr.split(/[\/\- \:]/);
+                            if (parts.length >= 3) {
+                                const day = parseInt(parts[0], 10);
+                                const month = parseInt(parts[1], 10) - 1; // bulan index dimulai dari 0
+                                const year = parseInt(parts[2], 10);
+                                const hours = parts.length > 3 ? parseInt(parts[3], 10) : 0;
+                                const minutes = parts.length > 4 ? parseInt(parts[4], 10) : 0;
+                                const seconds = parts.length > 5 ? parseInt(parts[5], 10) : 0;
+
+                                // Cek apakah posisi ke-3 adalah tahun (Format: DD/MM/YYYY)
+                                if (parts[2] && parts[2].length === 4) {
+                                    d = new Date(year, month, day, hours, minutes, seconds);
+                                    if (!isNaN(d.getTime())) lastUpdateMs = d.getTime();
+                                } 
+                                // Jika posisi pertama adalah tahun (Format: YYYY/MM/DD)
+                                else if (parts[0] && parts[0].length === 4) {
+                                    d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]), hours, minutes, seconds);
+                                    if (!isNaN(d.getTime())) lastUpdateMs = d.getTime();
+                                }
                             }
                         }
                     }
@@ -338,7 +361,7 @@
                     p.isNewUpdate = p.lastUpdateMs > 0 && (maxMs - p.lastUpdateMs <= THRESHOLD);
                 });
 
-                // Urutkan data berdasarkan lastUpdateMs dari yang terbaru ke yang terlama
+                // Urutkan data berdasarkan lastUpdateMs (tanggal dan jam), dari yang terbaru ke yang terlama
                 parsedData.sort((a, b) => b.lastUpdateMs - a.lastUpdateMs);
 
                 allProducts = parsedData;
