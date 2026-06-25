@@ -676,42 +676,49 @@
                 const pageNum = index + 1;
                 const imgUrl = p.imageId ? `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w1200` : '';
                 
-                // Konfigurasi konten gambar agar tampil utuh (aspect ratio terjaga)
+                const nameLength = p.name.length;
+                const nameSizeClass = nameLength > 80 ? 'text-base sm:text-xl' : (nameLength > 50 ? 'text-lg sm:text-2xl' : 'text-xl sm:text-3xl');
+
+                // Konfigurasi konten gambar agar tampil sangat besar tanpa terpotong
                 const imageContent = p.imageId && !p.isKosong 
-                    ? `<img src="${imgUrl}" class="max-h-[60%] max-w-[80%] object-contain mb-8 shadow-sm" alt="Preview" loading="lazy">` 
+                    ? `<img src="${imgUrl}" class="max-h-[75%] max-w-[90%] object-contain mb-4 shadow-sm" alt="Preview" loading="lazy">` 
                     : (p.isKosong && p.imageId 
-                        ? `<div class="relative max-h-[60%] max-w-[80%] flex justify-center items-center mb-8 shadow-sm">
+                        ? `<div class="relative max-h-[75%] max-w-[90%] flex justify-center items-center mb-4 shadow-sm">
                              <img src="${imgUrl}" class="max-h-full max-w-full object-contain opacity-50" alt="Preview" loading="lazy">
                              <div class="absolute bg-red-600 text-white font-black text-2xl sm:text-4xl px-8 py-2 rounded-xl border-4 border-white shadow-xl transform -rotate-12 tracking-widest">KOSONG</div>
                            </div>`
-                        : `<div class="w-48 h-64 bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center mb-8">
+                        : `<div class="w-full h-[60%] bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center mb-4">
                              <i data-lucide="image-off" class="w-10 h-10 text-slate-300 mb-2"></i>
                              <span class="text-slate-400 text-sm">Gambar Tidak Tersedia</span>
                            </div>`);
 
                 const pageDiv = document.createElement('div');
-                // Membuat container halaman dengan dimensi menyerupai A4 (1 : 1.414)
+                // Container kertas A4 proporsi 1 : 1.414
                 pageDiv.className = "bg-white shadow-lg w-full max-w-[210mm] mx-auto flex flex-col flex-shrink-0 mb-8 relative";
                 pageDiv.style.aspectRatio = "1 / 1.414";
                 pageDiv.style.padding = "6% 8%";
 
                 pageDiv.innerHTML = `
                     <!-- Header -->
-                    <div class="flex justify-between items-end border-b-2 border-slate-200 pb-2 mb-8">
+                    <div class="flex justify-between items-end border-b-2 border-slate-200 pb-2 mb-4">
                         <h2 class="text-blue-800 font-bold text-xl sm:text-2xl">Katalog Produk</h2>
-                        <span class="text-slate-500 text-xs sm:text-sm">Halaman ${pageNum}</span>
                     </div>
                     
                     <!-- Body (Full Page Center Aligned) -->
-                    <div class="flex-1 flex flex-col items-center justify-center relative w-full">
+                    <div class="flex-1 flex flex-col items-center justify-center relative w-full h-full overflow-hidden pb-8">
                         ${imageContent}
                         
-                        <!-- Text Footer -->
-                        <div class="text-center w-full flex flex-col items-center gap-2 mt-auto">
-                            <h3 class="text-slate-900 font-bold text-xl sm:text-3xl leading-snug line-clamp-2">${escapeHTML(p.name)}</h3>
-                            <div class="text-slate-600 font-semibold text-sm sm:text-lg mt-2">SKU: ${escapeHTML(p.sku)} &nbsp;|&nbsp; Unit: ${escapeHTML(p.unit)}</div>
-                            ${includePrice && p.price ? `<div class="text-green-600 font-bold text-lg sm:text-2xl mt-1">Harga: ${escapeHTML(p.price)}</div>` : ''}
+                        <!-- Text Footer tanpa clamp agar terbaca semua proporsional -->
+                        <div class="text-center w-full flex flex-col items-center gap-1 sm:gap-2">
+                            <h3 class="text-slate-900 font-bold ${nameSizeClass} leading-snug break-words px-4">${escapeHTML(p.name)}</h3>
+                            <div class="text-slate-600 font-semibold text-xs sm:text-base mt-1">SKU: ${escapeHTML(p.sku)} &nbsp;|&nbsp; Unit: ${escapeHTML(p.unit)}</div>
+                            ${includePrice && p.price ? `<div class="text-green-600 font-bold text-base sm:text-xl mt-1">Harga: ${escapeHTML(p.price)}</div>` : ''}
                         </div>
+                    </div>
+
+                    <!-- Footer Page Number -->
+                    <div class="absolute bottom-4 right-6 text-slate-500 text-xs sm:text-sm font-medium">
+                        Halaman ${pageNum}
                     </div>
                 `;
                 
@@ -720,45 +727,46 @@
             lucide.createIcons();
         }
 
-        // Helper membypass batas CORS melalui Canvas HTML saat mengubah gambar ke bentuk Blob PDF
+        // Helper andal membypass batas CORS melalui Canvas HTML saat mengubah gambar ke bentuk PDF
         function getBase64ImageFromUrl(imageUrl) {
             return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.crossOrigin = 'Anonymous'; 
-                
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0);
-                    resolve(canvas.toDataURL('image/jpeg', 0.95));
+                const processImage = (src) => {
+                    return new Promise((res, rej) => {
+                        const img = new Image();
+                        img.crossOrigin = 'Anonymous'; 
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 0, 0);
+                            res(canvas.toDataURL('image/jpeg', 0.95));
+                        };
+                        img.onerror = rej;
+                        img.src = src;
+                    });
                 };
-                
-                img.onerror = () => {
-                    // Fallback sistem proxy publik jika masih diblokir
-                    const proxyUrl = `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?url=${encodeURIComponent(imageUrl)}&container=focus&refresh=2592000`;
-                    const fallbackImg = new Image();
-                    fallbackImg.crossOrigin = 'Anonymous';
-                    
-                    fallbackImg.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = fallbackImg.width;
-                        canvas.height = fallbackImg.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#FFFFFF';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(fallbackImg, 0, 0);
-                        resolve(canvas.toDataURL('image/jpeg', 0.95));
-                    };
-                    
-                    fallbackImg.onerror = () => reject(new Error('Gagal memuat gambar lewat proxy'));
-                    fallbackImg.src = proxyUrl;
-                };
-                
-                img.src = imageUrl + '&nocache=' + new Date().getTime();
+
+                // 1. Coba metode normal URL
+                processImage(imageUrl)
+                    .then(resolve)
+                    .catch(() => {
+                        // 2. Coba lewat proxy Google untuk tembus CORS
+                        console.warn("Gambar diblokir CORS, mencoba mengambil melalui Proxy...");
+                        const proxyUrl1 = `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?url=${encodeURIComponent(imageUrl)}&container=focus&refresh=2592000`;
+                        processImage(proxyUrl1)
+                            .then(resolve)
+                            .catch(() => {
+                                // 3. Coba lewat proxy Allorigins sebagai benteng terakhir
+                                console.warn("Proxy 1 diblokir, mencoba Proxy 2...");
+                                const proxyUrl2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`;
+                                processImage(proxyUrl2)
+                                    .then(resolve)
+                                    .catch((err) => reject(new Error('Gagal merender gambar ke PDF')));
+                            });
+                    });
             });
         }
 
@@ -775,10 +783,10 @@
                 const selectedArr = allProducts.filter(p => selectedProductIds.has(p.id));
 
                 const margin = 15;
-                const imgW = 140; 
-                const imgH = 175;
-                const xImgOffset = (210 - imgW) / 2; 
-                const yBase = 35; 
+                const imgW = 160; // Diperbesar
+                const imgH = 200; // Aspek Rasio 4:5
+                const xImgOffset = (210 - imgW) / 2; // Otomatis tengah (25)
+                const yBase = 25; // Dinaikkan sedikit untuk memberi ruang lebih besar
 
                 for (let i = 0; i < selectedArr.length; i++) {
                     const p = selectedArr[i];
@@ -788,17 +796,12 @@
                         doc.addPage();
                     }
 
-                    // Header PDF
+                    // Header PDF (Hanya Tulisan Judul)
                     doc.setFontSize(16);
                     doc.setFont("helvetica", "bold");
                     doc.setTextColor(30, 64, 175); 
                     doc.text("Katalog Produk", margin, 15);
                     
-                    doc.setFontSize(9);
-                    doc.setFont("helvetica", "normal");
-                    doc.setTextColor(100, 116, 139); 
-                    doc.text(`Halaman ${pageNum}`, 210 - margin, 15, { align: "right" });
-
                     doc.setDrawColor(226, 232, 240); 
                     doc.setLineWidth(0.5);
                     doc.line(margin, 18, 210 - margin, 18);
@@ -810,6 +813,7 @@
                             const imgData = await getBase64ImageFromUrl(imgUrl);
                             doc.addImage(imgData, 'JPEG', xImgOffset, yBase, imgW, imgH);
                         } catch(e) { 
+                            console.error("Gagal cetak gambar PDF:", p.name, e);
                             doc.setDrawColor(200);
                             doc.rect(xImgOffset, yBase, imgW, imgH);
                             doc.setFontSize(12);
@@ -837,17 +841,23 @@
                     }
 
                     // Teks Keterangan dibawah Gambar
-                    const textY = yBase + imgH + 15; 
+                    const textY = yBase + imgH + 10; 
                     
-                    doc.setFontSize(18);
+                    // Deteksi panjang nama untuk scaling font agar tidak terpotong
+                    let nameLen = p.name.length;
+                    let fontSize = 18;
+                    if (nameLen > 80) fontSize = 12;
+                    else if (nameLen > 50) fontSize = 14;
+
+                    doc.setFontSize(fontSize);
                     doc.setFont("helvetica", "bold");
                     doc.setTextColor(15, 23, 42); 
                     
                     let lines = doc.splitTextToSize(p.name, 180);
-                    if (lines.length > 2) { lines = [lines[0], lines[1] + '...']; }
+                    // Langsung cetak semua baris teks tanpa limit
                     doc.text(lines, 105, textY, { align: "center" });
 
-                    const textYMeta = textY + (lines.length * 8) + 3;
+                    const textYMeta = textY + (lines.length * (fontSize * 0.35)) + 4;
                     doc.setFontSize(12);
                     doc.setFont("helvetica", "normal");
                     doc.setTextColor(71, 85, 105); 
@@ -855,11 +865,17 @@
                     doc.text(metaText, 105, textYMeta, { align: "center" });
                     
                     if (includePrice && p.price) {
-                        doc.setFontSize(16);
+                        doc.setFontSize(15);
                         doc.setFont("helvetica", "bold");
                         doc.setTextColor(22, 163, 74); 
-                        doc.text(`Harga: ${p.price}`, 105, textYMeta + 10, { align: "center" });
+                        doc.text(`Harga: ${p.price}`, 105, textYMeta + 8, { align: "center" });
                     }
+
+                    // Footer PDF (Nomor Halaman di sudut kanan bawah)
+                    doc.setFontSize(10);
+                    doc.setFont("helvetica", "normal");
+                    doc.setTextColor(100, 116, 139); 
+                    doc.text(`Halaman ${pageNum}`, 210 - margin, 297 - 10, { align: "right" });
                 }
 
                 doc.save("Katalog_Produk.pdf");
