@@ -26,6 +26,16 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8; 
         }
+        /* Custom Loader */
+        .pdf-loader {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="min-h-screen bg-slate-50 font-sans text-gray-800 selection:bg-blue-200 relative overflow-x-hidden pb-20">
@@ -163,7 +173,6 @@
                 <button onclick="clearSelection()" class="flex-1 sm:flex-none px-4 py-2.5 text-gray-600 bg-gray-100 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors">
                     Batal
                 </button>
-                <!-- Tombol Berubah Menjadi Lihat Katalog -->
                 <button onclick="openCatalogPreview()" class="flex-1 sm:flex-none px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-md hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors">
                     <i data-lucide="book-open" class="w-4 h-4"></i> Lihat Katalog
                 </button>
@@ -203,7 +212,7 @@
                 <div id="previewLoading" class="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center z-10 hidden">
                     <div class="pdf-loader mb-4 !border-blue-200 !border-t-blue-600"></div>
                     <p class="text-gray-800 font-bold tracking-wide">Menyiapkan Preview...</p>
-                    <p class="text-gray-500 text-sm mt-1">Mengunduh aset & merender halaman</p>
+                    <p class="text-gray-500 text-sm mt-1 text-center px-4">Mengunduh aset & merender halaman.<br>Bisa memakan waktu beberapa saat tergantung jumlah produk yang dipilih.</p>
                 </div>
             </div>
 
@@ -269,7 +278,7 @@
         let filteredProducts = [];
         let selectedProductIds = new Set();
         let currentPage = 1;
-        let currentPdfDoc = null; // Menyimpan instance PDF sementara
+        let currentPdfDoc = null; 
 
         // Fungsi Helper untuk mencegah error dari karakter khusus
         function escapeHTML(str) {
@@ -309,8 +318,6 @@
             toastMsg: document.getElementById('toastMessageText'),
             selectionBar: document.getElementById('selectionBar'),
             selCount: document.getElementById('selCount'),
-            
-            // Preview Modal Elements
             catalogPreviewModal: document.getElementById('catalogPreviewModal'),
             pdfIncludePrice: document.getElementById('pdfIncludePrice'),
             pdfPreviewFrame: document.getElementById('pdfPreviewFrame'),
@@ -332,7 +339,6 @@
                 
                 const text = await response.text();
                 
-                // Manual CSV Parser
                 const arr = [];
                 let quote = false;
                 let row = 0, col = 0;
@@ -353,7 +359,6 @@
 
                 if (arr.length === 0) throw new Error('Data CSV kosong.');
 
-                // Identify Headers
                 const headers = arr[0].map(h => h.trim().toLowerCase());
                 const colGambarStory = headers.findIndex(h => h.includes('gambar story'));
                 const colKategori = headers.findIndex(h => h.includes('kategori'));
@@ -364,7 +369,6 @@
 
                 const parsedData = [];
                 
-                // Extract Data
                 for (let i = 1; i < arr.length; i++) {
                     const rowData = arr[i];
                     if (rowData.length < 4 || !rowData[0]) continue; 
@@ -376,7 +380,6 @@
                     const brand = colMerk !== -1 && rowData[colMerk] ? rowData[colMerk].trim().replace(/[\r\n]+/g, ' ') : '';
                     const price = colEceran !== -1 && rowData[colEceran] ? rowData[colEceran].trim().replace(/[\r\n]+/g, ' ') : '';
 
-                    // Cek ketersediaan barang (Qty <= 0)
                     let isKosong = false;
                     if (colQty !== -1 && rowData[colQty]) {
                         const qtyVal = parseFloat(rowData[colQty].trim().replace(/,/g, ''));
@@ -385,7 +388,6 @@
                         }
                     }
 
-                    // Ambil dan parsing data Last Update
                     let lastUpdateStr = '';
                     let lastUpdateMs = 0;
                     if (colLastUpdate !== -1 && rowData[colLastUpdate]) {
@@ -425,14 +427,12 @@
                     parsedData.push({ id: i.toString(), sku, name, unit, imageId, category, brand, isKosong, lastUpdateStr, lastUpdateMs, price });
                 }
 
-                // Kalkulasi NEW UPDATE
                 const maxMs = Math.max(0, ...parsedData.map(p => p.lastUpdateMs));
                 const THRESHOLD = 30 * 24 * 60 * 60 * 1000; 
                 parsedData.forEach(p => {
                     p.isNewUpdate = p.lastUpdateMs > 0 && (maxMs - p.lastUpdateMs <= THRESHOLD);
                 });
 
-                // Urutkan data berdasarkan lastUpdateMs dari terbaru ke terlama
                 parsedData.sort((a, b) => b.lastUpdateMs - a.lastUpdateMs);
 
                 allProducts = parsedData;
@@ -448,7 +448,6 @@
             }
         }
 
-        // Setup UI States
         function showState(state) {
             DOM.loading.classList.add('hidden');
             DOM.error.classList.add('hidden');
@@ -459,7 +458,6 @@
             if(state === 'content') DOM.content.classList.remove('hidden');
         }
 
-        // Populate Select Dropdowns
         function populateFilters() {
             const uniqueCategories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
             const uniqueBrands = [...new Set(allProducts.map(p => p.brand).filter(Boolean))].sort();
@@ -480,7 +478,6 @@
             });
         }
 
-        // Apply Filters & Search
         function applyFilters() {
             const searchTerms = DOM.searchInput.value.toLowerCase();
             const selectedCat = DOM.categoryFilter.value;
@@ -504,7 +501,6 @@
             applyFilters();
         }
 
-        // Fungsi untuk men-toggle seleksi PDF
         function toggleSelection(event, id) {
             event.stopPropagation();
             if (selectedProductIds.has(id)) {
@@ -531,7 +527,6 @@
             updateSelectionBar();
         }
 
-        // Render Current Page Grid
         function renderView() {
             const totalItems = filteredProducts.length;
             const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
@@ -654,58 +649,84 @@
             }
         }
 
-        // --- STREAMING_CHUNK:Logic PDF Generation & Preview ---
+        // --- Logic PDF Generation & Preview ---
         
         function openCatalogPreview() {
             DOM.catalogPreviewModal.classList.remove('hidden');
             setTimeout(() => DOM.catalogPreviewModal.classList.remove('opacity-0'), 10);
-            updatePDFPreview(); // Buat & tampilkan preview awal
+            updatePDFPreview(); 
         }
 
         function closeCatalogPreview() {
             DOM.catalogPreviewModal.classList.add('opacity-0');
             setTimeout(() => {
                 DOM.catalogPreviewModal.classList.add('hidden');
-                DOM.pdfPreviewFrame.src = ''; // Bersihkan iframe memori
+                DOM.pdfPreviewFrame.src = ''; 
                 currentPdfDoc = null; 
             }, 300);
         }
 
-        async function getBase64ImageFromUrl(imageUrl) {
-            const res = await fetch(imageUrl);
-            const blob = await res.blob();
+        // Fungsi handal untuk membypass batas CORS melalui Canvas HTML saat men-download gambar ke dalam PDF
+        function getBase64ImageFromUrl(imageUrl) {
             return new Promise((resolve, reject) => {
-                const reader  = new FileReader();
-                reader.addEventListener("load", function () { resolve(reader.result); }, false);
-                reader.onerror = () => { reject("Error converting image"); };
-                reader.readAsDataURL(blob);
+                const img = new Image();
+                img.crossOrigin = 'Anonymous'; // Minta izin CORS
+                
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    // Background putih (berjaga jika gambar asli PNG berlatar transparan)
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0);
+                    resolve(canvas.toDataURL('image/jpeg', 0.95));
+                };
+                
+                img.onerror = () => {
+                    // Fallback jika Google Drive tetap memblokir CORS: Kita gunakan Public Proxy dari Google
+                    const proxyUrl = `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?url=${encodeURIComponent(imageUrl)}&container=focus&refresh=2592000`;
+                    const fallbackImg = new Image();
+                    fallbackImg.crossOrigin = 'Anonymous';
+                    
+                    fallbackImg.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = fallbackImg.width;
+                        canvas.height = fallbackImg.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(fallbackImg, 0, 0);
+                        resolve(canvas.toDataURL('image/jpeg', 0.95));
+                    };
+                    
+                    fallbackImg.onerror = () => reject(new Error('Gagal memuat gambar lewat proxy'));
+                    fallbackImg.src = proxyUrl;
+                };
+                
+                // Tambah param acak untuk menembus cache versi blokir dari browser
+                img.src = imageUrl + '&nocache=' + new Date().getTime();
             });
         }
 
-        // Fungsi membuat PDF dan menyisipkannya ke iFrame sbg Preview
         async function updatePDFPreview() {
             const includePrice = DOM.pdfIncludePrice.checked;
             
-            // Tampilkan loading overlay di dalam iframe area
             DOM.previewLoading.classList.remove('hidden');
             DOM.downloadActualPdfBtn.disabled = true;
-            DOM.pdfIncludePrice.disabled = true; // Lock checkbox selama render
+            DOM.pdfIncludePrice.disabled = true; 
 
             try {
                 const { jsPDF } = window.jspdf;
-                // A4 Size: 210 x 297 mm
                 const doc = new jsPDF('p', 'mm', 'a4');
                 const selectedArr = allProducts.filter(p => selectedProductIds.has(p.id));
 
                 const margin = 15;
-                
-                // Ukuran gambar rasio 4:5 untuk format 1 Halaman 1 Produk
                 const imgW = 140; 
                 const imgH = 175;
-                
-                // Center gambar di layout A4 (Lebar A4 210mm)
                 const xImgOffset = (210 - imgW) / 2; 
-                const yBase = 35; // Jarak dari atas
+                const yBase = 35; 
 
                 let pageNum = 1;
 
@@ -730,17 +751,14 @@
                 for (let i = 0; i < selectedArr.length; i++) {
                     const p = selectedArr[i];
                     
-                    // Tambah halaman baru untuk setiap produk setelah produk pertama
                     if (i > 0) {
                         doc.addPage();
                         pageNum++;
                         drawHeader(pageNum);
                     }
 
-                    // Render Gambar Utama
                     if (p.imageId && !p.isKosong) {
                         try {
-                            // Menggunakan resolusi w1200 agar tajam saat dicetak 1 halaman penuh
                             const imgUrl = `https://drive.google.com/thumbnail?id=${p.imageId}&sz=w1200`;
                             const imgData = await getBase64ImageFromUrl(imgUrl);
                             doc.addImage(imgData, 'JPEG', xImgOffset, yBase, imgW, imgH);
@@ -771,10 +789,8 @@
                         doc.text("KOSONG", 105, yBase + (imgH/2) + 3, { align: "center" });
                     }
 
-                    // Render Teks Deskripsi di Bawah Gambar
-                    const textY = yBase + imgH + 15; // Jarak teks dari gambar
+                    const textY = yBase + imgH + 15; 
                     
-                    // Judul Produk
                     doc.setFontSize(18);
                     doc.setFont("helvetica", "bold");
                     doc.setTextColor(15, 23, 42); 
@@ -783,7 +799,6 @@
                     if (lines.length > 2) { lines = [lines[0], lines[1] + '...']; }
                     doc.text(lines, 105, textY, { align: "center" });
 
-                    // Info SKU & Unit
                     const textYMeta = textY + (lines.length * 8) + 3;
                     doc.setFontSize(12);
                     doc.setFont("helvetica", "normal");
@@ -791,7 +806,6 @@
                     let metaText = `SKU: ${p.sku}   |   Unit: ${p.unit}`;
                     doc.text(metaText, 105, textYMeta, { align: "center" });
                     
-                    // Info Harga
                     if (includePrice && p.price) {
                         doc.setFontSize(16);
                         doc.setFont("helvetica", "bold");
@@ -800,10 +814,8 @@
                     }
                 }
 
-                // Simpan object PDF secara global agar bisa didownload langsung tanpa render ulang
                 currentPdfDoc = doc;
                 
-                // Konversi PDF ke URL Blob dan tampilkan di iFrame
                 const pdfBlobUrl = doc.output('bloburl');
                 DOM.pdfPreviewFrame.src = pdfBlobUrl;
 
@@ -813,11 +825,10 @@
             } finally {
                 DOM.previewLoading.classList.add('hidden');
                 DOM.downloadActualPdfBtn.disabled = false;
-                DOM.pdfIncludePrice.disabled = false; // Buka kunci checkbox
+                DOM.pdfIncludePrice.disabled = false; 
             }
         }
 
-        // Fungsi ketika user mengklik tombol "Download PDF" yang asli
         function downloadGeneratedPDF() {
             if (currentPdfDoc) {
                 currentPdfDoc.save("Katalog_Produk.pdf");
@@ -827,9 +838,7 @@
             }
         }
 
-        // --- Akhir Logic PDF ---
-
-        // --- STREAMING_CHUNK:Logic Modal Besar & Image sharing ---
+        // --- Logic Modal Besar & Image sharing ---
         async function shareContent(imageUrl, sku, name) {
             DOM.modalShareText.textContent = "Memproses...";
             const textToCopy = `${sku} ${name}`;
