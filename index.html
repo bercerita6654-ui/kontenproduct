@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Konten Produk</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;  
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 font-sans text-gray-800 selection:bg-blue-200 relative">
+
+    <!-- Navbar / Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col lg:flex-row items-center justify-between py-4 gap-4">
+                <div class="flex items-center gap-3 w-full lg:w-auto">
+                    <div class="bg-blue-600 p-2 rounded-xl text-white shadow-md flex-shrink-0">
+                        <i data-lucide="package" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-extrabold text-gray-900 tracking-tight">Konten Produk</h1>
+                        <p class="text-xs text-gray-500 font-medium">Katalog Flyer & Knowledge Base</p>
+                    </div>
+                </div>
+                
+                <!-- Search & Filter Bar -->
+                <div class="flex flex-col md:flex-row gap-3 w-full lg:w-auto">
+                    
+                    <!-- Filter Kategori -->
+                    <div class="relative group w-full md:w-40 lg:w-44 flex-shrink-0">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="filter" class="h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors"></i>
+                        </div>
+                        <select id="categoryFilter" class="block w-full pl-9 pr-8 py-2.5 border border-gray-300 rounded-xl leading-5 bg-gray-50 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-gray-700 truncate cursor-pointer appearance-none">
+                            <option value="">Semua Kategori</option>
+                        </select>
+                        <!-- Custom dropdown arrow -->
+                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+                        </div>
+                    </div>
+
+                    <!-- Filter Merk -->
+                    <div class="relative group w-full md:w-40 lg:w-44 flex-shrink-0">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="filter" class="h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors"></i>
+                        </div>
+                        <select id="brandFilter" class="block w-full pl-9 pr-8 py-2.5 border border-gray-300 rounded-xl leading-5 bg-gray-50 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-gray-700 truncate cursor-pointer appearance-none">
+                            <option value="">Semua Merk</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+                        </div>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="relative group w-full md:w-56 lg:w-64 flex-shrink-0">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="search" class="h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors"></i>
+                        </div>
+                        <input type="text" id="searchInput" class="block w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl leading-5 bg-gray-50 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm" placeholder="Cari SKU / Nama...">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 z-0">
+        
+        <!-- Loading State -->
+        <div id="loadingState" class="flex flex-col items-center justify-center py-20">
+            <i data-lucide="refresh-cw" class="w-10 h-10 text-blue-500 animate-spin mb-4"></i>
+            <p class="text-gray-500 font-medium">Memuat data katalog produk...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="hidden bg-red-50 text-red-700 p-6 rounded-2xl flex flex-col items-center justify-center text-center border border-red-100 max-w-2xl mx-auto mt-10">
+            <i data-lucide="alert-circle" class="w-12 h-12 mb-3 text-red-500"></i>
+            <h3 class="font-bold text-lg mb-1">Terjadi Kesalahan</h3>
+            <p id="errorMessage" class="text-sm opacity-90 mb-4"></p>
+            <button onclick="fetchData()" class="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-red-700 transition-colors">
+                Coba Lagi
+            </button>
+        </div>
+
+        <!-- Content Area -->
+        <div id="contentArea" class="hidden">
+            
+            <!-- Summary Info -->
+            <div class="mb-6 flex justify-between items-center text-sm font-medium text-gray-500">
+                <p id="summaryText">Menampilkan <span class="text-gray-900 font-bold">0</span> hingga <span class="text-gray-900 font-bold">0</span> dari <span class="text-gray-900 font-bold">0</span> produk</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden text-center py-20 bg-white rounded-3xl border border-dashed border-gray-300">
+                <i data-lucide="package" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
+                <h3 class="text-lg font-bold text-gray-900 mb-1">Produk tidak ditemukan</h3>
+                <p class="text-gray-500 text-sm">Tidak ada produk yang cocok dengan pencarian Anda</p>
+                <button onclick="resetFilters()" class="mt-4 px-4 py-2 text-sm text-blue-600 font-semibold bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                    Hapus Pencarian & Filter
+                </button>
+            </div>
+
+            <!-- Product Grid -->
+            <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 lg:gap-8">
+                <!-- Cards will be injected here via JS -->
+            </div>
+
+            <!-- Pagination -->
+            <div id="paginationContainer" class="mt-10 flex items-center justify-center gap-4 hidden">
+                <button id="prevBtn" onclick="changePage(-1)" class="flex items-center gap-1 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i> Sebelumnya
+                </button>
+                <div class="text-sm font-medium text-gray-600">
+                    Halaman <span id="currentPageText" class="font-bold text-gray-900">1</span> dari <span id="totalPagesText" class="font-bold text-gray-900">1</span>
+                </div>
+                <button id="nextBtn" onclick="changePage(1)" class="flex items-center gap-1 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    Selanjutnya <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal Gambar Besar -->
+    <div id="imageModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-300 hidden opacity-0 transition-opacity" onclick="closeModal()">
+        <div class="relative max-w-4xl w-full h-full max-h-[90vh] flex items-center justify-center p-2" onclick="event.stopPropagation()">
+            <button onclick="closeModal()" class="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-10 focus:outline-none" aria-label="Tutup preview gambar">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <img id="modalImageSrc" src="" alt="Preview Besar" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
+        </div>
+    </div>
+
+    <!-- Notifikasi Toast -->
+    <div id="toastNotification" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-900/95 backdrop-blur-sm text-white px-5 py-3 rounded-2xl shadow-2xl z-50 flex items-center gap-2 transition-all duration-300 opacity-0 pointer-events-none translate-y-4">
+        <i data-lucide="check-circle" class="w-5 h-5 text-green-400"></i>
+        <span id="toastMessageText" class="text-sm font-medium">Teks disalin</span>
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCxz1GPm7QU9IS1yBiSjvIdNTLUsvvplOCyT_R3XH4O-LuVbHoY_bXn1LTH5lpnlolJ29BhUgEdnFm/pub?gid=1564332470&single=true&output=csv';
+        const ITEMS_PER_PAGE = 50;
+        
+        let allProducts = [];
+        let filteredProducts = [];
+        let currentPage = 1;
+
+        // DOM Elements
+        const DOM = {
+            loading: document.getElementById('loadingState'),
+            error: document.getElementById('errorState'),
+            errorMsg: document.getElementById('errorMessage'),
+            content: document.getElementById('contentArea'),
+            grid: document.getElementById('productGrid'),
+            empty: document.getElementById('emptyState'),
+            summary: document.getElementById('summaryText'),
+            categoryFilter: document.getElementById('categoryFilter'),
+            brandFilter: document.getElementById('brandFilter'),
+            searchInput: document.getElementById('searchInput'),
+            pagination: document.getElementById('paginationContainer'),
+            prevBtn: document.getElementById('prevBtn'),
+            nextBtn: document.getElementById('nextBtn'),
+            currPageText: document.getElementById('currentPageText'),
+            totalPagesText: document.getElementById('totalPagesText'),
+            modal: document.getElementById('imageModal'),
+            modalImg: document.getElementById('modalImageSrc'),
+            toast: document.getElementById('toastNotification'),
+            toastMsg: document.getElementById('toastMessageText')
+        };
+
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Fetch and Parse CSV Data
+        async function fetchData() {
+            showState('loading');
+            try {
+                const response = await fetch(CSV_URL);
+                if (!response.ok) throw new Error('Gagal terhubung ke sumber data Google Sheets.');
+                
+                const text = await response.text();
+                
+                // Manual CSV Parser (Handles quotes & commas correctly)
+                const arr = [];
+                let quote = false;
+                let row = 0, col = 0;
+                for (let c = 0; c < text.length; c++) {
+                    let cc = text[c], nc = text[c + 1];
+                    arr[row] = arr[row] || [];
+                    arr[row][col] = arr[row][col] || '';
+                    
+                    if (cc === '"' && quote && nc === '"') { arr[row][col] += cc; ++c; continue; }
+                    if (cc === '"') { quote = !quote; continue; }
+                    if (cc === ',' && !quote) { ++col; continue; }
+                    if (cc === '\r' && nc === '\n' && !quote) { ++row; col = 0; ++c; continue; }
+                    if (cc === '\n' && !quote) { ++row; col = 0; continue; }
+                    if (cc === '\r' && !quote) { ++row; col = 0; continue; }
+                    
+                    arr[row][col] += cc;
+                }
+
+                if (arr.length === 0) throw new Error('Data CSV kosong.');
+
+                // Identify Headers
+                const headers = arr[0].map(h => h.trim().toLowerCase());
+                const colGambarStory = headers.findIndex(h => h.includes('gambar story'));
+                const colKategori = headers.findIndex(h => h.includes('kategori'));
+                const colMerk = headers.findIndex(h => h.includes('merk') || h.includes('brand'));
+
+                const parsedData = [];
+                
+                // Extract Data (starting row index 1)
+                for (let i = 1; i < arr.length; i++) {
+                    const rowData = arr[i];
+                    if (rowData.length < 4 || !rowData[0]) continue; 
+
+                    const sku = rowData[0] ? rowData[0].trim() : '';
+                    const name = rowData[2] ? rowData[2].trim() : '';
+                    const unit = rowData[3] ? rowData[3].trim() : '';
+                    const category = colKategori !== -1 && rowData[colKategori] ? rowData[colKategori].trim() : '';
+                    const brand = colMerk !== -1 && rowData[colMerk] ? rowData[colMerk].trim() : '';
+
+                    let imageId = '';
+                    if (colGambarStory !== -1 && rowData[colGambarStory]) {
+                        const rawImageInfo = rowData[colGambarStory].trim();
+                        const match = rawImageInfo.match(/(?:id=|d\/)([a-zA-Z0-9_-]{25,})/);
+                        imageId = match ? match[1] : rawImageInfo;
+                    }
+
+                    parsedData.push({ id: i, sku, name, unit, imageId, category, brand });
+                }
+
+                allProducts = parsedData;
+                filteredProducts = [...allProducts];
+                
+                populateFilters();
+                applyFilters();
+                showState('content');
+
+            } catch (err) {
+                DOM.errorMsg.textContent = err.message;
+                showState('error');
+            }
+        }
+
+        // Setup UI States
+        function showState(state) {
+            DOM.loading.classList.add('hidden');
+            DOM.error.classList.add('hidden');
+            DOM.content.classList.add('hidden');
+            
+            if(state === 'loading') DOM.loading.classList.remove('hidden');
+            if(state === 'error') DOM.error.classList.remove('hidden');
+            if(state === 'content') DOM.content.classList.remove('hidden');
+        }
+
+        // Populate Select Dropdowns
+        function populateFilters() {
+            const uniqueCategories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+            const uniqueBrands = [...new Set(allProducts.map(p => p.brand).filter(Boolean))].sort();
+            
+            // Clear existing options except first
+            DOM.categoryFilter.innerHTML = '<option value="">Semua Kategori</option>';
+            DOM.brandFilter.innerHTML = '<option value="">Semua Merk</option>';
+
+            uniqueCategories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c; opt.textContent = c;
+                DOM.categoryFilter.appendChild(opt);
+            });
+
+            uniqueBrands.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b; opt.textContent = b;
+                DOM.brandFilter.appendChild(opt);
+            });
+        }
+
+        // Apply Filters & Search
+        function applyFilters() {
+            const searchTerms = DOM.searchInput.value.toLowerCase();
+            const selectedCat = DOM.categoryFilter.value;
+            const selectedBrand = DOM.brandFilter.value;
+
+            filteredProducts = allProducts.filter(p => {
+                const matchSearch = p.name.toLowerCase().includes(searchTerms) || p.sku.toLowerCase().includes(searchTerms);
+                const matchCat = selectedCat === '' || p.category === selectedCat;
+                const matchBrand = selectedBrand === '' || p.brand === selectedBrand;
+                return matchSearch && matchCat && matchBrand;
+            });
+
+            currentPage = 1;
+            renderView();
+        }
+
+        // Reset Filters UI
+        function resetFilters() {
+            DOM.searchInput.value = '';
+            DOM.categoryFilter.value = '';
+            DOM.brandFilter.value = '';
+            applyFilters();
+        }
+
+        // Render Current Page Grid
+        function renderView() {
+            const totalItems = filteredProducts.length;
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+            
+            // Show/Hide Empty State
+            if (totalItems === 0) {
+                DOM.grid.innerHTML = '';
+                DOM.empty.classList.remove('hidden');
+                DOM.pagination.classList.add('hidden');
+                DOM.summary.innerHTML = `Menampilkan <span class="text-gray-900 font-bold">0</span> produk`;
+                return;
+            }
+
+            DOM.empty.classList.add('hidden');
+            
+            // Slice data for pagination
+            const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+            const endIndex = startIndex + ITEMS_PER_PAGE;
+            const paginatedData = filteredProducts.slice(startIndex, endIndex);
+
+            // Update Summary
+            const endDisplay = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
+            DOM.summary.innerHTML = `Menampilkan <span class="text-gray-900 font-bold">${startIndex + 1}</span> hingga <span class="text-gray-900 font-bold">${endDisplay}</span> dari <span class="text-gray-900 font-bold">${totalItems}</span> produk`;
+
+            // Build HTML Grid
+            let gridHTML = '';
+            paginatedData.forEach(product => {
+                const imgThumbUrl = product.imageId ? `https://drive.google.com/thumbnail?id=${product.imageId}&sz=w800` : '';
+                const imgLargeUrl = product.imageId ? `https://drive.google.com/thumbnail?id=${product.imageId}&sz=w1200` : '';
+                
+                // Handle Image fallback structure properly as a string
+                const imageContent = product.imageId 
+                    ? `<img src="${imgThumbUrl}" alt="Flyer ${product.name}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" onclick="handleImageClick('${imgLargeUrl}', '${product.sku.replace(/'/g, "\\'")}', '${product.name.replace(/'/g, "\\'")}')" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
+                       <div class="hidden w-full h-full flex flex-col items-center justify-center text-gray-400 p-6 text-center bg-gray-100">
+                           <i data-lucide="image" class="w-12 h-12 mb-3 text-gray-300"></i>
+                           <span class="text-sm font-medium text-gray-500">Gambar rusak/tidak akses</span>
+                       </div>`
+                    : `<div class="w-full h-full flex flex-col items-center justify-center text-gray-400 p-6 text-center bg-gray-100">
+                           <i data-lucide="image" class="w-12 h-12 mb-3 text-gray-300"></i>
+                           <span class="text-sm font-medium text-gray-500">Gambar tidak tersedia</span>
+                       </div>`;
+
+                gridHTML += `
+                <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col group">
+                    <div class="w-full aspect-[4/5] bg-gray-50 relative overflow-hidden flex items-center justify-center">
+                        ${imageContent}
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                    </div>
+                    <div class="p-5 flex flex-col flex-grow bg-white z-10">
+                        <div class="flex items-center gap-2 mb-3 flex-wrap">
+                            <span class="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg flex items-center gap-1 border border-blue-100">
+                                <i data-lucide="hash" class="w-3.5 h-3.5"></i> ${product.sku || 'N/A'}
+                            </span>
+                            <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg flex items-center gap-1 border border-emerald-100">
+                                <i data-lucide="layers" class="w-3.5 h-3.5"></i> ${product.unit || '-'}
+                            </span>
+                        </div>
+                        <h3 class="text-gray-800 font-bold text-base leading-snug line-clamp-2" title="${product.name}">
+                            ${product.name || 'Produk Tanpa Nama'}
+                        </h3>
+                    </div>
+                </div>`;
+            });
+            
+            DOM.grid.innerHTML = gridHTML;
+            lucide.createIcons(); // Re-initialize icons inside new HTML
+
+            // Update Pagination Controls
+            if (totalPages > 1) {
+                DOM.pagination.classList.remove('hidden');
+                DOM.currPageText.textContent = currentPage;
+                DOM.totalPagesText.textContent = totalPages;
+                
+                DOM.prevBtn.disabled = currentPage === 1;
+                DOM.nextBtn.disabled = currentPage === totalPages;
+            } else {
+                DOM.pagination.classList.add('hidden');
+            }
+        }
+
+        // Pagination Logic
+        function changePage(direction) {
+            const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+            let newPage = currentPage + direction;
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                renderView();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // Image Click Handler (Modal, Copy Text, Share)
+        function handleImageClick(imageUrl, sku, name) {
+            // 1. Open Modal
+            if(imageUrl) {
+                DOM.modalImg.src = imageUrl;
+                DOM.modal.classList.remove('hidden');
+                setTimeout(() => DOM.modal.classList.remove('opacity-0'), 10); // for transition
+            }
+
+            const textToCopy = `${sku} ${name}`;
+
+            // 2. Copy to clipboard
+            const textArea = document.createElement("textarea");
+            textArea.value = textToCopy;
+            textArea.style.position = "fixed";
+            textArea.style.opacity = "0";
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast(`Teks disalin: ${textToCopy}`);
+            } catch (err) {
+                console.error('Gagal menyalin teks', err);
+            }
+            document.body.removeChild(textArea);
+
+            // 3. Native Share (if supported on mobile/modern browsers)
+            if (navigator.share) {
+                navigator.share({
+                    title: name,
+                    text: textToCopy,
+                }).catch((err) => console.log('Batal membagikan', err));
+            }
+        }
+
+        function closeModal() {
+            DOM.modal.classList.add('opacity-0');
+            setTimeout(() => {
+                DOM.modal.classList.add('hidden');
+                DOM.modalImg.src = '';
+            }, 300); // match duration
+        }
+
+        function showToast(message) {
+            DOM.toastMsg.textContent = message;
+            DOM.toast.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+            
+            // Auto hide after 3 seconds
+            setTimeout(() => {
+                DOM.toast.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+            }, 3000);
+        }
+
+        // Event Listeners for Filters
+        DOM.searchInput.addEventListener('input', applyFilters);
+        DOM.categoryFilter.addEventListener('change', applyFilters);
+        DOM.brandFilter.addEventListener('change', applyFilters);
+        
+        // Modal close on escape key
+        document.addEventListener('keydown', (e) => {
+            if(e.key === 'Escape' && !DOM.modal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        // Initialize App
+        fetchData();
+
+    </script>
+</body>
+</html>
