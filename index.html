@@ -149,19 +149,37 @@
     </main>
 
     <!-- Modal Gambar Besar -->
-    <div id="imageModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-300 hidden opacity-0" onclick="closeModal()">
-        <div class="relative max-w-4xl w-full h-full max-h-[90vh] flex items-center justify-center p-2" onclick="event.stopPropagation()">
-            <button onclick="closeModal()" class="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-30 focus:outline-none" aria-label="Tutup preview gambar">
+    <div id="imageModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm transition-opacity duration-300 hidden opacity-0" onclick="closeModal()">
+        <div class="relative w-full h-full max-w-4xl flex flex-col items-center justify-center p-2" onclick="event.stopPropagation()">
+            <!-- Close Button -->
+            <button onclick="closeModal()" class="absolute top-4 right-4 p-2 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors z-40 focus:outline-none" aria-label="Tutup preview gambar">
                 <i data-lucide="x" class="w-6 h-6"></i>
             </button>
-            <img id="modalImageSrc" src="" alt="Preview Besar" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl relative z-10">
             
-            <!-- Label KOSONG di Modal -->
-            <div id="modalKosongLabel" class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none hidden">
-                 <div class="bg-red-600 text-white font-black text-4xl sm:text-6xl px-8 py-3 sm:px-12 sm:py-4 rounded-3xl border-[6px] sm:border-[8px] border-white shadow-2xl transform -rotate-12 tracking-widest opacity-95">
-                   KOSONG
-                 </div>
+            <!-- Image Wrapper -->
+            <div class="relative w-full flex-1 flex items-center justify-center overflow-hidden max-h-[75vh]">
+                <img id="modalImageSrc" src="" alt="Preview Besar" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl relative z-10">
+                
+                <!-- Label KOSONG di Modal -->
+                <div id="modalKosongLabel" class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none hidden">
+                     <div class="bg-red-600 text-white font-black text-4xl sm:text-6xl px-8 py-3 sm:px-12 sm:py-4 rounded-3xl border-[6px] sm:border-[8px] border-white shadow-2xl transform -rotate-12 tracking-widest opacity-95">
+                       KOSONG
+                     </div>
+                </div>
             </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 flex flex-wrap items-center justify-center gap-3 z-30 w-full px-4">
+                <button id="modalShareBtn" class="flex flex-1 sm:flex-none justify-center items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-xl shadow-lg hover:from-blue-700 hover:to-indigo-700 transition-all active:scale-95">
+                    <i data-lucide="share-2" class="w-5 h-5"></i>
+                    <span id="modalShareText">Bagikan ke Story</span>
+                </button>
+                <button id="modalDownloadBtn" class="flex flex-1 sm:flex-none justify-center items-center gap-2 px-5 py-3 bg-white/10 text-white border border-white/20 text-sm font-semibold rounded-xl shadow-lg hover:bg-white/20 transition-all active:scale-95" title="Buka gambar di tab baru untuk disimpan">
+                    <i data-lucide="download" class="w-5 h-5"></i>
+                    <span>Unduh Gambar</span>
+                </button>
+            </div>
+            <p class="text-white/50 text-xs mt-3 text-center z-30">*Tahan gambar (long-press) untuk menyimpan manual ke galeri HP</p>
         </div>
     </div>
 
@@ -179,6 +197,17 @@
         let allProducts = [];
         let filteredProducts = [];
         let currentPage = 1;
+
+        // Fungsi Helper untuk mencegah error dari karakter khusus
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         // DOM Elements
         const DOM = {
@@ -200,6 +229,9 @@
             modal: document.getElementById('imageModal'),
             modalImg: document.getElementById('modalImageSrc'),
             modalKosong: document.getElementById('modalKosongLabel'),
+            modalShareBtn: document.getElementById('modalShareBtn'),
+            modalShareText: document.getElementById('modalShareText'),
+            modalDownloadBtn: document.getElementById('modalDownloadBtn'),
             toast: document.getElementById('toastNotification'),
             toastMsg: document.getElementById('toastMessageText')
         };
@@ -242,7 +274,7 @@
                 const colGambarStory = headers.findIndex(h => h.includes('gambar story'));
                 const colKategori = headers.findIndex(h => h.includes('kategori'));
                 const colMerk = headers.findIndex(h => h.includes('merk') || h.includes('brand'));
-                const colQty = headers.findIndex(h => h.includes('qty')); // Tambahkan pencarian kolom Qty
+                const colQty = headers.findIndex(h => h.includes('qty'));
 
                 const parsedData = [];
                 
@@ -251,11 +283,11 @@
                     const rowData = arr[i];
                     if (rowData.length < 4 || !rowData[0]) continue; 
 
-                    const sku = rowData[0] ? rowData[0].trim() : '';
-                    const name = rowData[2] ? rowData[2].trim() : '';
-                    const unit = rowData[3] ? rowData[3].trim() : '';
-                    const category = colKategori !== -1 && rowData[colKategori] ? rowData[colKategori].trim() : '';
-                    const brand = colMerk !== -1 && rowData[colMerk] ? rowData[colMerk].trim() : '';
+                    const sku = rowData[0] ? rowData[0].trim().replace(/[\r\n]+/g, ' ') : '';
+                    const name = rowData[2] ? rowData[2].trim().replace(/[\r\n]+/g, ' ') : '';
+                    const unit = rowData[3] ? rowData[3].trim().replace(/[\r\n]+/g, ' ') : '';
+                    const category = colKategori !== -1 && rowData[colKategori] ? rowData[colKategori].trim().replace(/[\r\n]+/g, ' ') : '';
+                    const brand = colMerk !== -1 && rowData[colMerk] ? rowData[colMerk].trim().replace(/[\r\n]+/g, ' ') : '';
 
                     // Cek ketersediaan barang (Qty <= 0)
                     let isKosong = false;
@@ -305,7 +337,6 @@
             const uniqueCategories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
             const uniqueBrands = [...new Set(allProducts.map(p => p.brand).filter(Boolean))].sort();
             
-            // Clear existing options except first
             DOM.categoryFilter.innerHTML = '<option value="">Semua Kategori</option>';
             DOM.brandFilter.innerHTML = '<option value="">Semua Merk</option>';
 
@@ -352,7 +383,6 @@
             const totalItems = filteredProducts.length;
             const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
             
-            // Show/Hide Empty State
             if (totalItems === 0) {
                 DOM.grid.innerHTML = '';
                 DOM.empty.classList.remove('hidden');
@@ -363,24 +393,20 @@
 
             DOM.empty.classList.add('hidden');
             
-            // Slice data for pagination
             const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
             const endIndex = startIndex + ITEMS_PER_PAGE;
             const paginatedData = filteredProducts.slice(startIndex, endIndex);
 
-            // Update Summary
             const endDisplay = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
             DOM.summary.innerHTML = `Menampilkan <span class="text-gray-900 font-bold">${startIndex + 1}</span> hingga <span class="text-gray-900 font-bold">${endDisplay}</span> dari <span class="text-gray-900 font-bold">${totalItems}</span> produk`;
 
-            // Build HTML Grid
             let gridHTML = '';
             paginatedData.forEach(product => {
                 const imgThumbUrl = product.imageId ? `https://drive.google.com/thumbnail?id=${product.imageId}&sz=w800` : '';
                 const imgLargeUrl = product.imageId ? `https://drive.google.com/thumbnail?id=${product.imageId}&sz=w1200` : '';
                 
-                // Menambahkan argumen product.isKosong ke handler click
                 const imageContent = product.imageId 
-                    ? `<img src="${imgThumbUrl}" alt="Flyer ${product.name}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" onclick="handleImageClick('${imgLargeUrl}', '${product.sku.replace(/'/g, "\\'")}', '${product.name.replace(/'/g, "\\'")}', ${product.isKosong})" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
+                    ? `<img src="${imgThumbUrl}" alt="Flyer ${escapeHTML(product.name)}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" data-imageurl="${imgLargeUrl}" data-sku="${escapeHTML(product.sku)}" data-name="${escapeHTML(product.name)}" data-iskosong="${product.isKosong}" onclick="handleImageClick(this)" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
                        <div class="hidden w-full h-full flex flex-col items-center justify-center text-gray-400 p-6 text-center bg-gray-100">
                            <i data-lucide="image" class="w-12 h-12 mb-3 text-gray-300"></i>
                            <span class="text-sm font-medium text-gray-500">Gambar rusak/tidak akses</span>
@@ -390,7 +416,6 @@
                            <span class="text-sm font-medium text-gray-500">Gambar tidak tersedia</span>
                        </div>`;
 
-                // Jika isKosong bernilai true, tambahkan elemen label Kosong yang overlay di atas gambar pada Card
                 const outOfStockOverlay = product.isKosong 
                     ? `<div class="absolute inset-0 bg-black/40 flex items-center justify-center z-20 pointer-events-none">
                          <div class="bg-red-600 text-white font-black text-xl px-5 py-2 rounded-xl border-[3px] border-white shadow-xl transform -rotate-12 tracking-widest">
@@ -409,28 +434,26 @@
                     <div class="p-5 flex flex-col flex-grow bg-white z-10">
                         <div class="flex items-center gap-2 mb-3 flex-wrap">
                             <span class="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg flex items-center gap-1 border border-blue-100">
-                                <i data-lucide="hash" class="w-3.5 h-3.5"></i> ${product.sku || 'N/A'}
+                                <i data-lucide="hash" class="w-3.5 h-3.5"></i> ${escapeHTML(product.sku) || 'N/A'}
                             </span>
                             <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg flex items-center gap-1 border border-emerald-100">
-                                <i data-lucide="layers" class="w-3.5 h-3.5"></i> ${product.unit || '-'}
+                                <i data-lucide="layers" class="w-3.5 h-3.5"></i> ${escapeHTML(product.unit) || '-'}
                             </span>
                         </div>
-                        <h3 class="text-gray-800 font-bold text-base leading-snug line-clamp-2" title="${product.name}">
-                            ${product.name || 'Produk Tanpa Nama'}
+                        <h3 class="text-gray-800 font-bold text-base leading-snug line-clamp-2" title="${escapeHTML(product.name)}">
+                            ${escapeHTML(product.name) || 'Produk Tanpa Nama'}
                         </h3>
                     </div>
                 </div>`;
             });
             
             DOM.grid.innerHTML = gridHTML;
-            lucide.createIcons(); // Re-initialize icons inside new HTML
+            lucide.createIcons(); 
 
-            // Update Pagination Controls
             if (totalPages > 1) {
                 DOM.pagination.classList.remove('hidden');
                 DOM.currPageText.textContent = currentPage;
                 DOM.totalPagesText.textContent = totalPages;
-                
                 DOM.prevBtn.disabled = currentPage === 1;
                 DOM.nextBtn.disabled = currentPage === totalPages;
             } else {
@@ -438,7 +461,6 @@
             }
         }
 
-        // Pagination Logic
         function changePage(direction) {
             const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
             let newPage = currentPage + direction;
@@ -449,25 +471,66 @@
             }
         }
 
-        // Image Click Handler (Modal, Copy Text, Share)
-        function handleImageClick(imageUrl, sku, name, isKosong) {
-            // 1. Open Modal
+        // Logic membagikan Konten (Coba share File Gambar, fallback ke URL)
+        async function shareContent(imageUrl, sku, name) {
+            DOM.modalShareText.textContent = "Memproses...";
+            const textToCopy = `${sku} ${name}`;
+            
+            try {
+                // Mencoba mengambil data gambar untuk di-share sebagai file ke IG Story/WA Story
+                const response = await fetch(imageUrl);
+                const blob = await response.blob();
+                const file = new File([blob], `${sku}.jpg`, { type: blob.type || 'image/jpeg' });
+
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: name,
+                        text: textToCopy
+                    });
+                } else {
+                    throw new Error("Tidak mendukung share file");
+                }
+            } catch (error) {
+                // Fallback jika fetch diblokir (CORS) atau device tidak mendukung
+                console.log("Fallback ke share teks/url", error);
+                if (navigator.share) {
+                    navigator.share({
+                        title: name,
+                        text: textToCopy,
+                        url: imageUrl
+                    }).catch(err => console.log('Share dibatalkan', err));
+                } else {
+                    showToast('Fitur share tidak didukung di browser ini.');
+                }
+            } finally {
+                DOM.modalShareText.textContent = "Bagikan ke Story";
+            }
+        }
+
+        function handleImageClick(element) {
+            const imageUrl = element.getAttribute('data-imageurl');
+            const sku = element.getAttribute('data-sku');
+            const name = element.getAttribute('data-name');
+            const isKosong = element.getAttribute('data-iskosong') === 'true';
+
+            // 1. Tampilkan Modal
             if(imageUrl) {
                 DOM.modalImg.src = imageUrl;
                 DOM.modal.classList.remove('hidden');
-                setTimeout(() => DOM.modal.classList.remove('opacity-0'), 10); // for transition
+                setTimeout(() => DOM.modal.classList.remove('opacity-0'), 10); 
                 
-                // Tampilkan atau sembunyikan label "KOSONG" pada modal
-                if (isKosong) {
-                    DOM.modalKosong.classList.remove('hidden');
-                } else {
-                    DOM.modalKosong.classList.add('hidden');
-                }
+                if (isKosong) DOM.modalKosong.classList.remove('hidden');
+                else DOM.modalKosong.classList.add('hidden');
+
+                // Hubungkan tombol dengan data gambar yang sedang dibuka
+                DOM.modalShareBtn.onclick = () => shareContent(imageUrl, sku, name);
+                DOM.modalDownloadBtn.onclick = () => window.open(imageUrl, '_blank');
             }
 
             const textToCopy = `${sku} ${name}`;
 
-            // 2. Copy to clipboard
+            // 2. Teks tetap otomatis disalin ke clipboard
             const textArea = document.createElement("textarea");
             textArea.value = textToCopy;
             textArea.style.position = "fixed";
@@ -481,14 +544,6 @@
                 console.error('Gagal menyalin teks', err);
             }
             document.body.removeChild(textArea);
-
-            // 3. Native Share (if supported on mobile/modern browsers)
-            if (navigator.share) {
-                navigator.share({
-                    title: name,
-                    text: textToCopy,
-                }).catch((err) => console.log('Batal membagikan', err));
-            }
         }
 
         function closeModal() {
@@ -496,33 +551,29 @@
             setTimeout(() => {
                 DOM.modal.classList.add('hidden');
                 DOM.modalImg.src = '';
-                DOM.modalKosong.classList.add('hidden'); // Reset label kosong saat menutup modal
-            }, 300); // match duration
+                DOM.modalKosong.classList.add('hidden');
+            }, 300); 
         }
 
         function showToast(message) {
             DOM.toastMsg.textContent = message;
             DOM.toast.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
             
-            // Auto hide after 3 seconds
             setTimeout(() => {
                 DOM.toast.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
             }, 3000);
         }
 
-        // Event Listeners for Filters
         DOM.searchInput.addEventListener('input', applyFilters);
         DOM.categoryFilter.addEventListener('change', applyFilters);
         DOM.brandFilter.addEventListener('change', applyFilters);
         
-        // Modal close on escape key
         document.addEventListener('keydown', (e) => {
             if(e.key === 'Escape' && !DOM.modal.classList.contains('hidden')) {
                 closeModal();
             }
         });
 
-        // Initialize App
         fetchData();
 
     </script>
