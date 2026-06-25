@@ -149,12 +149,19 @@
     </main>
 
     <!-- Modal Gambar Besar -->
-    <div id="imageModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-300 hidden opacity-0 transition-opacity" onclick="closeModal()">
+    <div id="imageModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-300 hidden opacity-0" onclick="closeModal()">
         <div class="relative max-w-4xl w-full h-full max-h-[90vh] flex items-center justify-center p-2" onclick="event.stopPropagation()">
-            <button onclick="closeModal()" class="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-10 focus:outline-none" aria-label="Tutup preview gambar">
+            <button onclick="closeModal()" class="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-30 focus:outline-none" aria-label="Tutup preview gambar">
                 <i data-lucide="x" class="w-6 h-6"></i>
             </button>
-            <img id="modalImageSrc" src="" alt="Preview Besar" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
+            <img id="modalImageSrc" src="" alt="Preview Besar" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl relative z-10">
+            
+            <!-- Label KOSONG di Modal -->
+            <div id="modalKosongLabel" class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none hidden">
+                 <div class="bg-red-600 text-white font-black text-4xl sm:text-6xl px-8 py-3 sm:px-12 sm:py-4 rounded-3xl border-[6px] sm:border-[8px] border-white shadow-2xl transform -rotate-12 tracking-widest opacity-95">
+                   KOSONG
+                 </div>
+            </div>
         </div>
     </div>
 
@@ -192,6 +199,7 @@
             totalPagesText: document.getElementById('totalPagesText'),
             modal: document.getElementById('imageModal'),
             modalImg: document.getElementById('modalImageSrc'),
+            modalKosong: document.getElementById('modalKosongLabel'),
             toast: document.getElementById('toastNotification'),
             toastMsg: document.getElementById('toastMessageText')
         };
@@ -234,6 +242,7 @@
                 const colGambarStory = headers.findIndex(h => h.includes('gambar story'));
                 const colKategori = headers.findIndex(h => h.includes('kategori'));
                 const colMerk = headers.findIndex(h => h.includes('merk') || h.includes('brand'));
+                const colQty = headers.findIndex(h => h.includes('qty')); // Tambahkan pencarian kolom Qty
 
                 const parsedData = [];
                 
@@ -248,6 +257,15 @@
                     const category = colKategori !== -1 && rowData[colKategori] ? rowData[colKategori].trim() : '';
                     const brand = colMerk !== -1 && rowData[colMerk] ? rowData[colMerk].trim() : '';
 
+                    // Cek ketersediaan barang (Qty <= 0)
+                    let isKosong = false;
+                    if (colQty !== -1 && rowData[colQty]) {
+                        const qtyVal = parseFloat(rowData[colQty].trim().replace(/,/g, ''));
+                        if (!isNaN(qtyVal) && qtyVal <= 0) {
+                            isKosong = true;
+                        }
+                    }
+
                     let imageId = '';
                     if (colGambarStory !== -1 && rowData[colGambarStory]) {
                         const rawImageInfo = rowData[colGambarStory].trim();
@@ -255,7 +273,7 @@
                         imageId = match ? match[1] : rawImageInfo;
                     }
 
-                    parsedData.push({ id: i, sku, name, unit, imageId, category, brand });
+                    parsedData.push({ id: i, sku, name, unit, imageId, category, brand, isKosong });
                 }
 
                 allProducts = parsedData;
@@ -360,9 +378,9 @@
                 const imgThumbUrl = product.imageId ? `https://drive.google.com/thumbnail?id=${product.imageId}&sz=w800` : '';
                 const imgLargeUrl = product.imageId ? `https://drive.google.com/thumbnail?id=${product.imageId}&sz=w1200` : '';
                 
-                // Handle Image fallback structure properly as a string
+                // Menambahkan argumen product.isKosong ke handler click
                 const imageContent = product.imageId 
-                    ? `<img src="${imgThumbUrl}" alt="Flyer ${product.name}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" onclick="handleImageClick('${imgLargeUrl}', '${product.sku.replace(/'/g, "\\'")}', '${product.name.replace(/'/g, "\\'")}')" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
+                    ? `<img src="${imgThumbUrl}" alt="Flyer ${product.name}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" onclick="handleImageClick('${imgLargeUrl}', '${product.sku.replace(/'/g, "\\'")}', '${product.name.replace(/'/g, "\\'")}', ${product.isKosong})" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
                        <div class="hidden w-full h-full flex flex-col items-center justify-center text-gray-400 p-6 text-center bg-gray-100">
                            <i data-lucide="image" class="w-12 h-12 mb-3 text-gray-300"></i>
                            <span class="text-sm font-medium text-gray-500">Gambar rusak/tidak akses</span>
@@ -372,11 +390,21 @@
                            <span class="text-sm font-medium text-gray-500">Gambar tidak tersedia</span>
                        </div>`;
 
+                // Jika isKosong bernilai true, tambahkan elemen label Kosong yang overlay di atas gambar pada Card
+                const outOfStockOverlay = product.isKosong 
+                    ? `<div class="absolute inset-0 bg-black/40 flex items-center justify-center z-20 pointer-events-none">
+                         <div class="bg-red-600 text-white font-black text-xl px-5 py-2 rounded-xl border-[3px] border-white shadow-xl transform -rotate-12 tracking-widest">
+                           KOSONG
+                         </div>
+                       </div>`
+                    : '';
+
                 gridHTML += `
-                <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col group">
+                <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col group relative">
                     <div class="w-full aspect-[4/5] bg-gray-50 relative overflow-hidden flex items-center justify-center">
                         ${imageContent}
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                        ${outOfStockOverlay}
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
                     </div>
                     <div class="p-5 flex flex-col flex-grow bg-white z-10">
                         <div class="flex items-center gap-2 mb-3 flex-wrap">
@@ -422,12 +450,19 @@
         }
 
         // Image Click Handler (Modal, Copy Text, Share)
-        function handleImageClick(imageUrl, sku, name) {
+        function handleImageClick(imageUrl, sku, name, isKosong) {
             // 1. Open Modal
             if(imageUrl) {
                 DOM.modalImg.src = imageUrl;
                 DOM.modal.classList.remove('hidden');
                 setTimeout(() => DOM.modal.classList.remove('opacity-0'), 10); // for transition
+                
+                // Tampilkan atau sembunyikan label "KOSONG" pada modal
+                if (isKosong) {
+                    DOM.modalKosong.classList.remove('hidden');
+                } else {
+                    DOM.modalKosong.classList.add('hidden');
+                }
             }
 
             const textToCopy = `${sku} ${name}`;
@@ -461,6 +496,7 @@
             setTimeout(() => {
                 DOM.modal.classList.add('hidden');
                 DOM.modalImg.src = '';
+                DOM.modalKosong.classList.add('hidden'); // Reset label kosong saat menutup modal
             }, 300); // match duration
         }
 
